@@ -29,10 +29,15 @@ pub struct KeyPeekAppCore {
     pub session_store: Arc<dyn SessionStateStore>,
     pub connection_mgr: DeviceConnectionManager,
     pub editor: EditorState,
+    /// True while the connection attempt made on start is unresolved. Failures
+    /// of that attempt are logged instead of shown, so an unattended start does
+    /// not open a window; a failed attempt the user made still does.
+    auto_connecting: bool,
 }
 
 impl KeyPeekAppCore {
-    /// Creates a new `KeyPeekAppCore` with loaded settings and an initialized connection manager.    ///
+    /// Creates a new `KeyPeekAppCore` with loaded settings and an initialized connection manager.
+    ///
     /// The keyboard used in the previous session is reconnected when it is present,
     /// and the settings window opens only when that did not happen: a quiet start
     /// is the normal case, while a fresh install still lands in the device list.
@@ -65,6 +70,7 @@ impl KeyPeekAppCore {
             session_store,
             connection_mgr,
             editor: EditorState::new(),
+            auto_connecting: remembered.is_some(),
         };
 
         // Only reconnect to the remembered keyboard; connecting to a device the
@@ -154,6 +160,17 @@ impl KeyPeekAppCore {
         outcome
     }
 
+    /// Surfaces a connection failure to the user, unless it came from the attempt
+    /// made on start: an overlay that opens an error window on every login is
+    /// noise, so that one is only logged.
+    fn report_failure(&mut self, message: String) {
+        if std::mem::take(&mut self.auto_connecting) {
+            eprintln!("KeyPeek: automatic connection failed: {message}");
+        } else {
+            self.ui.set_error(message);
+        }
+    }
+
     /// Checks if the keyboard overlay should be visible according to the manual
     /// override, open windows, or active layer hold timeouts.
     pub fn is_overlay_visible(&self) -> bool {
@@ -237,20 +254,23 @@ impl KeyPeekAppCore {
         if let Some(event) = &event {
             match event {
                 ConnectionEvent::Connected => {
+                    self.auto_connecting = false;
                     self.ui.clear_alerts();
                     self.sync_visual_settings();
                     self.remember_connected_device();
                 }
                 ConnectionEvent::ConnectionFailed(e) => {
-                    self.ui.set_error(e.clone());
+                    self.report_failure(e.clone());
                 }
                 ConnectionEvent::Disconnected => {
                     self.close_editor();
                 }
                 ConnectionEvent::DeviceLocked(dev) => {
-                    self.ui.set_error(dev.lock_message());
+                    self.report_failure(dev.lock_message());
                 }
-                ConnectionEvent::RequiresLayoutFile(_) => {}
+                ConnectionEvent::RequiresLayoutFile(_) => {
+                    self.auto_connecting = false;
+                }
             }
         }
 
@@ -355,6 +375,29 @@ mod tests {
             requires_layout_file: false,
             spec: keypeek_protocol::test_utils::test_spec(),
         }
+    }
+
+    #[test]
+    fn a_failure_from_the_automatic_attempt_is_not_shown() {
+        let mut core = make_test_core(false);
+        core.auto_connecting = true;
+
+        core.report_failure("Connection timed out".to_string());
+
+        assert!(
+            core.ui.settings_error.is_none(),
+            "an unattended start must not open an error window"
+        );
+        assert!(!core.auto_connecting);
+    }
+
+    #[test]
+    fn a_failure_after_the_automatic_attempt_is_shown() {
+        let mut core = make_test_core(false);
+
+        core.report_failure("Connection timed out".to_string());
+
+        assert!(core.ui.settings_error.is_some());
     }
 
     #[test]
