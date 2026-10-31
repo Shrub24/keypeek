@@ -92,7 +92,7 @@ impl WebOverlayApp {
                 settings_store,
                 std::sync::Arc::new(keypeek_presentation::MemorySessionState::default()),
                 available_devices,
-                false,
+                false, // the browser cannot be launched with a settings request
             ),
             pairing_rx: None,
             pending_via: None,

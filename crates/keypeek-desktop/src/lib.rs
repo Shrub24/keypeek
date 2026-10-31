@@ -15,6 +15,15 @@ pub mod tray;
 #[cfg(target_os = "linux")]
 pub mod wayland;
 
+/// How a platform host should start the UI.
+#[derive(Clone, Copy, Debug)]
+pub struct RunOptions {
+    /// Force the eframe host on XWayland (Linux only).
+    pub force_x11: bool,
+    /// Open the settings window at start unless a remembered keyboard connected.
+    pub open_settings: bool,
+}
+
 /// Session state for the desktop runners: file-backed in the user's state
 /// directory, in memory when no such directory is available.
 pub fn session_state_store() -> Arc<dyn SessionStateStore> {
@@ -27,12 +36,17 @@ pub fn session_state_store() -> Arc<dyn SessionStateStore> {
 pub fn run(
     settings_store: Arc<dyn SettingsStore>,
     devices: Vec<DiscoveredDevice>,
+    options: RunOptions,
 ) -> Result<(), Box<dyn std::error::Error>> {
     #[cfg(target_os = "linux")]
     {
         // `WAYLAND_DISPLAY` is unset under XWayland, so X11 falls through to eframe below.
         if std::env::var_os("WAYLAND_DISPLAY").is_some() {
-            match wayland::run(settings_store.clone(), devices.clone()) {
+            match wayland::run(
+                settings_store.clone(),
+                devices.clone(),
+                options.open_settings,
+            ) {
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     // No wlr-layer-shell (e.g. GNOME/Mutter): fall back to eframe on
@@ -41,12 +55,26 @@ pub fn run(
                         "KeyPeek: Wayland layer-shell host unavailable ({e}); \
                          falling back to eframe on XWayland for always-on-top."
                     );
-                    return Ok(eframe_host::run(settings_store, devices, true)?);
+                    return Ok(eframe_host::run(
+                        settings_store,
+                        devices,
+                        RunOptions {
+                            force_x11: true,
+                            ..options
+                        },
+                    )?);
                 }
             }
         }
     }
 
-    eframe_host::run(settings_store, devices, false)?;
+    eframe_host::run(
+        settings_store,
+        devices,
+        RunOptions {
+            force_x11: false,
+            ..options
+        },
+    )?;
     Ok(())
 }

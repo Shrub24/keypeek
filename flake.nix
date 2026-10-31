@@ -345,9 +345,8 @@
             };
             Service = {
               ExecStart =
-                if cfg.settings != {}
-                then "${lib.getExe cfg.package} --config ${configFile}"
-                else "${lib.getExe cfg.package}";
+                "${lib.getExe cfg.package} --no-settings"
+                + lib.optionalString (cfg.settings != {}) " --config ${configFile}";
               Restart = "on-failure";
               RestartSec = 2;
             };

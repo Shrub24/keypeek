@@ -74,6 +74,12 @@ Platform differences are confined to narrow ports:
 
 Native specifics: the Wayland host builds a wlr-layer-shell surface anchored to all edges and sized by the compositor, bound to the output named by the `monitor` setting (`Primary` lets the compositor choose). Because a layer surface's output is fixed at creation, changing the setting destroys the surface and its EGL state and rebuilds them on the new output. One `event_queue.roundtrip` runs before the first bind so output names are known and the overlay appears on the configured display from its first frame, and the first frame after a bind only commits a transparent buffer so the compositor reports scale before the UI is laid out. The host falls back to eframe on XWayland when layer shell is unavailable (for example on GNOME/Mutter), where only the primary display is used; the tray runs on a dedicated GTK thread on Linux because libappindicator registers its StatusNotifierItem over DBus through the glib main loop, and offers Settings…, Show Overlay, Hide Overlay, Follow Layers, and Quit.
 
+## Starting the desktop app
+
+`main` resolves the command line into one of three shapes: a run, a hotkey command, or `--settings`. Hotkey commands send one line to the control socket and exit non-zero when nothing answers; `--settings` is the launcher path, so it falls back to starting an instance with the settings window open when the socket refuses. The packaged desktop entry uses it, which is what keeps a click on the application menu from producing a second overlay beside a service-managed one.
+
+`RunOptions::open_settings` reaches the app core, which opens the window only when it did not auto-connect to a remembered keyboard, so a normal start is quiet. `--no-settings` sets it false outright and is what the generated systemd unit passes, since a machine whose keyboard is switched off at boot must not get a settings window either.
+
 ## Settings
 
 Settings cover window size, the anchor and the two per-axis offsets that place it, the target output, timeout (including an infinite setting), activation delay, the visible-layer mask, legend mode, font size multiplier, ellipsis behaviour, the font colour, and per-layer theme colours. Offsets are inward distances from the edge the anchor uses on each axis, and a negative value moves the overlay past that edge; a `margin` key from an older file is read as both offsets. The settings window edits a draft and commits it to the active settings; persistence goes through the store, so a read-only store makes the window's changes session-only.

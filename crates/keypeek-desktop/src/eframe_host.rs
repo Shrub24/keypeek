@@ -123,11 +123,11 @@ fn enable_dwm_per_pixel_alpha(cc: &eframe::CreationContext<'_>) {
 pub fn run(
     settings_store: Arc<dyn SettingsStore>,
     devices: Vec<DiscoveredDevice>,
-    #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] force_x11: bool,
+    run_options: super::RunOptions,
 ) -> Result<(), eframe::Error> {
     #[cfg(target_os = "linux")]
-    if force_x11 {
-        match run_inner(settings_store.clone(), devices.clone(), true) {
+    if run_options.force_x11 {
+        match run_inner(settings_store.clone(), devices.clone(), true, run_options) {
             Ok(()) => return Ok(()),
             Err(e) => {
                 eprintln!(
@@ -137,13 +137,14 @@ pub fn run(
             }
         }
     }
-    run_inner(settings_store, devices, false)
+    run_inner(settings_store, devices, false, run_options)
 }
 
 fn run_inner(
     settings_store: Arc<dyn SettingsStore>,
     devices: Vec<DiscoveredDevice>,
     #[cfg_attr(not(target_os = "linux"), allow(unused_variables))] force_x11: bool,
+    run_options: super::RunOptions,
 ) -> Result<(), eframe::Error> {
     #[allow(unused_mut)]
     let mut viewport = egui::ViewportBuilder::default()
@@ -213,6 +214,7 @@ fn run_inner(
                 settings_store,
                 super::session_state_store(),
                 devices,
+                run_options.open_settings,
             );
             Ok(Box::new(EframeApp {
                 app,

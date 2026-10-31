@@ -33,13 +33,15 @@ pub struct KeyPeekAppCore {
 
 impl KeyPeekAppCore {
     /// Creates a new `KeyPeekAppCore` with loaded settings and an initialized connection manager.    ///
-    /// The keyboard used in the previous session is reconnected when it is present.
+    /// The keyboard used in the previous session is reconnected when it is present,
+    /// and the settings window opens only when that did not happen: a quiet start
+    /// is the normal case, while a fresh install still lands in the device list.
     pub fn new(
         ui_wake: UiWake,
         settings_store: Arc<dyn SettingsStore>,
         session_store: Arc<dyn SessionStateStore>,
         available_devices: Vec<DiscoveredDevice>,
-        settings_visible: bool,
+        open_settings: bool,
     ) -> Self {
         let base_settings = settings_store.load();
         let mut connection_mgr = DeviceConnectionManager::new(available_devices, ui_wake);
@@ -52,7 +54,7 @@ impl KeyPeekAppCore {
 
         let mut core = Self {
             ui: UiState {
-                settings_visible,
+                settings_visible: open_settings && remembered.is_none(),
                 settings_error: None,
                 settings_warning: None,
                 overlay_override: OverlayOverride::default(),
@@ -353,6 +355,26 @@ mod tests {
             requires_layout_file: false,
             spec: keypeek_protocol::test_utils::test_spec(),
         }
+    }
+
+    #[test]
+    fn an_open_settings_request_is_honoured_without_a_remembered_keyboard() {
+        let core = make_test_core(true);
+        assert!(core.ui.settings_visible);
+    }
+
+    #[test]
+    fn a_connect_on_start_keeps_the_settings_window_closed() {
+        let session = Arc::new(MemorySessionState::default());
+        session.set_last_device(&DeviceIdentity::from_device(&test_device("Corne")));
+        let core = make_test_core_with(true, vec![test_device("Corne")], session);
+        assert!(!core.ui.settings_visible);
+    }
+
+    #[test]
+    fn a_suppressed_request_stays_suppressed_even_without_a_keyboard() {
+        let core = make_test_core_with(false, Vec::new(), Arc::new(MemorySessionState::default()));
+        assert!(!core.ui.settings_visible);
     }
 
     #[test]

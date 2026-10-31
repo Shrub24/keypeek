@@ -151,11 +151,17 @@ keypeek --auto       # back to layer-driven visibility
 keypeek --settings   # open the settings window
 ```
 
-These reach the running instance over `$XDG_RUNTIME_DIR/keypeek.sock`, so they do nothing when KeyPeek is not running. Bind them like any other command, for example in Hyprland:
+Bind them like any other command, for example in Hyprland:
 
 ```
 bind = SUPER, K, exec, keypeek --toggle
 ```
+
+These reach the running instance over `$XDG_RUNTIME_DIR/keypeek.sock`. The hotkey commands do nothing when KeyPeek is not running; `--settings` is the exception — it starts an instance with the settings window open when none is listening, which is why the desktop entry uses it. Launching KeyPeek from your application menu therefore configures the running instance instead of starting a second overlay.
+
+With a declarative configuration the running instance cannot write settings (the file comes from the Nix store), so changes made in a window opened this way last for the session. Persistent changes belong in the Nix configuration.
+
+When KeyPeek is started by the bundled systemd service, `--no-settings` keeps the settings window closed; a normal start opens it only when no remembered keyboard was connected.
 
 The override lasts until it is changed again and is not written to `settings.ini`, so a declarative configuration stays authoritative. A settings or key editor window always keeps the overlay visible, because the editor selects keys by clicking them.
 

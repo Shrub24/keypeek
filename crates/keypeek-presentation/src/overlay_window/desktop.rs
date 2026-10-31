@@ -50,6 +50,7 @@ impl DesktopOverlayApp {
         settings_store: Arc<dyn SettingsStore>,
         session_store: Arc<dyn SessionStateStore>,
         available_devices: Vec<DiscoveredDevice>,
+        open_settings: bool,
     ) -> Self {
         Self {
             commands,
@@ -58,7 +59,7 @@ impl DesktopOverlayApp {
                 settings_store,
                 session_store,
                 available_devices,
-                true,
+                open_settings,
             ),
             file_dialog: egui_file_dialog::FileDialog::new(),
             mouse_passthrough: None,

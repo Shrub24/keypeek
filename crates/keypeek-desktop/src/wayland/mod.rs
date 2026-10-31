@@ -122,6 +122,7 @@ struct WaylandApp {
 pub fn run(
     settings_store: Arc<dyn SettingsStore>,
     devices: Vec<DiscoveredDevice>,
+    open_settings: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let conn = Connection::connect_to_env()?;
     let (globals, mut event_queue) = registry_queue_init::<WaylandApp>(&conn)?;
@@ -168,6 +169,7 @@ pub fn run(
         settings_store,
         super::session_state_store(),
         devices,
+        open_settings,
     );
 
     let mut state = WaylandApp {
