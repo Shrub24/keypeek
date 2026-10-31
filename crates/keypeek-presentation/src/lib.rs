@@ -2,12 +2,14 @@ pub mod key_paint;
 pub mod keymap_editor;
 pub mod overlay_host;
 pub mod overlay_window;
+pub mod session_state;
 pub mod settings;
 pub mod ui_widgets;
 
 pub use key_paint::*;
 pub use overlay_host::*;
 pub use overlay_window::*;
+pub use session_state::*;
 pub use settings::*;
 pub use ui_widgets::*;
 

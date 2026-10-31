@@ -133,6 +133,12 @@ On NixOS, add the package to `services.udev.packages`. On other distributions wi
 - **Desktop:** Devices are scanned when the app starts. For QMK you will be prompted to select the `keyboard_info.json` generated from your keymap when you connect. For Vial and ZMK, just select the connected device from the dropdown, since they provide layout information directly.
 - **Web:** In a browser supporting WebHID, Web Serial, or Web Bluetooth (such as Chrome or Edge), select your keyboard using the browser pairing dialog.
 
+### Remembered keyboard
+
+The desktop app remembers the keyboard it last connected to and reconnects to it automatically on the next start, if it is present. It is identified by driver, vendor/product ID, and name, so it is still recognised when it moves to another USB port or connects over Bluetooth instead.
+
+The record lives in `~/.local/state/keypeek/last-device` (the `$XDG_STATE_HOME` equivalent), not in `settings.ini` — it is state, not configuration, so a declarative setup is never rewritten. Delete that file to start disconnected again. If the remembered keyboard is not present, KeyPeek starts disconnected rather than picking a different device.
+
 ### Overlay visibility
 
 By default the overlay follows the layers you hold and disappears after the configured timeout. A running instance can also be driven from outside:

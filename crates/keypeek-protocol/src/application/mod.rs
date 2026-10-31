@@ -12,7 +12,8 @@ pub use connection_manager::{
     ConnectOutcome, ConnectionEvent, ConnectionState, ConnectionStatus, DeviceConnectionManager,
 };
 pub use device_discovery::{
-    discover_devices, DeviceDriverScanner, DiscoveredDevice, DiscoveryContext, HidDeviceInfo,
+    discover_devices, DeviceDriverScanner, DeviceIdentity, DiscoveredDevice, DiscoveryContext,
+    HidDeviceInfo,
 };
 pub use keyboard::Keyboard;
 pub use session::{handle_device_event, run_keymap_command, KeyboardSession, KeymapCommand};

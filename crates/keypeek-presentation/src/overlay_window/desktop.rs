@@ -3,6 +3,7 @@ use std::sync::Arc;
 use super::app_core::KeyPeekAppCore;
 use super::commands::CommandQueue;
 use crate::overlay_host::OverlayHost;
+use crate::session_state::SessionStateStore;
 use crate::settings::SettingsStore;
 use keypeek_protocol::connection_manager::{ConnectOutcome, ConnectionEvent};
 use keypeek_protocol::{DiscoveredDevice, Keyboard, UiWake};
@@ -47,11 +48,18 @@ impl DesktopOverlayApp {
         commands: Arc<CommandQueue>,
         ui_wake: UiWake,
         settings_store: Arc<dyn SettingsStore>,
+        session_store: Arc<dyn SessionStateStore>,
         available_devices: Vec<DiscoveredDevice>,
     ) -> Self {
         Self {
             commands,
-            core: KeyPeekAppCore::new(ui_wake, settings_store, available_devices, true),
+            core: KeyPeekAppCore::new(
+                ui_wake,
+                settings_store,
+                session_store,
+                available_devices,
+                true,
+            ),
             file_dialog: egui_file_dialog::FileDialog::new(),
             mouse_passthrough: None,
         }

@@ -47,6 +47,62 @@ impl DiscoveredDevice {
     }
 }
 
+/// Stable identity of a keyboard model, used to recognise it in a later session.
+///
+/// Transport details are deliberately absent: a serial path or BLE address
+/// identifies a connection, not a keyboard, and changes between reboots.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DeviceIdentity {
+    pub driver_id: String,
+    pub vid: u16,
+    pub pid: u16,
+    pub name: String,
+}
+
+impl DeviceIdentity {
+    pub fn from_device(device: &DiscoveredDevice) -> Self {
+        Self {
+            driver_id: device.driver_id.to_string(),
+            vid: device.vid,
+            pid: device.pid,
+            name: device.base_name.clone(),
+        }
+    }
+
+    pub fn matches(&self, device: &DiscoveredDevice) -> bool {
+        self.driver_id == device.driver_id
+            && self.vid == device.vid
+            && self.pid == device.pid
+            && self.name == device.base_name
+    }
+
+    /// Single-line form written to the session state file: `driver:vid:pid:name`.
+    pub fn to_wire(&self) -> String {
+        format!(
+            "{}:{:04x}:{:04x}:{}",
+            self.driver_id, self.vid, self.pid, self.name
+        )
+    }
+
+    /// Parses [`Self::to_wire`]; the name may itself contain colons.
+    pub fn parse(value: &str) -> Option<Self> {
+        let mut parts = value.trim().splitn(4, ':');
+        let driver_id = parts.next()?.to_string();
+        let vid = u16::from_str_radix(parts.next()?, 16).ok()?;
+        let pid = u16::from_str_radix(parts.next()?, 16).ok()?;
+        let name = parts.next()?.to_string();
+        if driver_id.is_empty() || name.is_empty() {
+            return None;
+        }
+        Some(Self {
+            driver_id,
+            vid,
+            pid,
+            name,
+        })
+    }
+}
+
 /// Generic, protocol-agnostic snapshot of an attached USB HID interface.
 #[derive(Clone, Debug)]
 pub struct HidDeviceInfo {
@@ -134,6 +190,74 @@ mod tests {
 
     fn dummy_spec() -> ConnectionSpec {
         crate::test_utils::test_spec()
+    }
+
+    #[test]
+    fn identity_round_trips_through_the_wire_form() {
+        let corne = DiscoveredDevice {
+            base_name: "Corne".to_string(),
+            vid: 0x1d50,
+            pid: 0x615e,
+            driver_id: "zmk",
+            protocol_label: "ZMK Serial",
+            requires_layout_file: false,
+            spec: dummy_spec(),
+        };
+        let identity = DeviceIdentity::from_device(&corne);
+        assert_eq!(identity.to_wire(), "zmk:1d50:615e:Corne");
+        assert_eq!(DeviceIdentity::parse(&identity.to_wire()), Some(identity));
+    }
+
+    #[test]
+    fn identity_keeps_colons_in_the_name() {
+        let identity = DeviceIdentity {
+            driver_id: "zmk".to_string(),
+            vid: 0x1d50,
+            pid: 0x615e,
+            name: "Split: Corne".to_string(),
+        };
+        assert_eq!(DeviceIdentity::parse(&identity.to_wire()), Some(identity));
+    }
+
+    #[test]
+    fn identity_rejects_malformed_values() {
+        assert_eq!(DeviceIdentity::parse(""), None);
+        assert_eq!(DeviceIdentity::parse("zmk:zz:615e:Corne"), None);
+        assert_eq!(DeviceIdentity::parse("zmk:1d50:615e"), None);
+        assert_eq!(DeviceIdentity::parse(":1d50:615e:Corne"), None);
+    }
+
+    #[test]
+    fn identity_matches_the_same_board_on_another_transport() {
+        let corne = DiscoveredDevice {
+            base_name: "Corne".to_string(),
+            vid: 0x1d50,
+            pid: 0x615e,
+            driver_id: "zmk",
+            protocol_label: "ZMK Serial",
+            requires_layout_file: false,
+            spec: dummy_spec(),
+        };
+        let identity = DeviceIdentity::from_device(&corne);
+
+        let over_ble = DiscoveredDevice {
+            protocol_label: "ZMK BLE",
+            ..corne.clone()
+        };
+        assert!(identity.matches(&over_ble));
+
+        let other_firmware = DiscoveredDevice {
+            driver_id: "vial",
+            protocol_label: "Vial",
+            ..corne.clone()
+        };
+        assert!(!identity.matches(&other_firmware));
+
+        let other_board = DiscoveredDevice {
+            base_name: "Lily58".to_string(),
+            ..corne
+        };
+        assert!(!identity.matches(&other_board));
     }
 
     #[test]

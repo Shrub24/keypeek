@@ -207,7 +207,13 @@ fn run_inner(
             add_phosphor_to_fonts(&mut fonts);
             cc.egui_ctx.set_fonts(fonts);
 
-            let app = DesktopOverlayApp::new(commands, ui_wake, settings_store, devices);
+            let app = DesktopOverlayApp::new(
+                commands,
+                ui_wake,
+                settings_store,
+                super::session_state_store(),
+                devices,
+            );
             Ok(Box::new(EframeApp {
                 app,
                 _tray: tray_icon,

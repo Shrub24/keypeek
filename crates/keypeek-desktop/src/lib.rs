@@ -2,7 +2,9 @@
 
 use std::sync::Arc;
 
-use keypeek_presentation::SettingsStore;
+use keypeek_presentation::{
+    FileSessionState, MemorySessionState, SessionStateStore, SettingsStore,
+};
 use keypeek_protocol::DiscoveredDevice;
 
 pub mod eframe_host;
@@ -12,6 +14,15 @@ pub mod tray;
 
 #[cfg(target_os = "linux")]
 pub mod wayland;
+
+/// Session state for the desktop runners: file-backed in the user's state
+/// directory, in memory when no such directory is available.
+pub fn session_state_store() -> Arc<dyn SessionStateStore> {
+    match FileSessionState::default_path() {
+        Some(path) => Arc::new(FileSessionState::new(path)),
+        None => Arc::new(MemorySessionState::default()),
+    }
+}
 
 pub fn run(
     settings_store: Arc<dyn SettingsStore>,

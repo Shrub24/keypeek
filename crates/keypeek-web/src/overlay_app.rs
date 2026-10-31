@@ -87,7 +87,13 @@ impl WebOverlayApp {
         available_devices: Vec<DiscoveredDevice>,
     ) -> Self {
         Self {
-            core: KeyPeekAppCore::new(ui_wake, settings_store, available_devices, false),
+            core: KeyPeekAppCore::new(
+                ui_wake,
+                settings_store,
+                std::sync::Arc::new(keypeek_presentation::MemorySessionState::default()),
+                available_devices,
+                false,
+            ),
             pairing_rx: None,
             pending_via: None,
             web_file_rx: None,

@@ -162,7 +162,13 @@ pub fn run(
         eprintln!("KeyPeek: overlay control unavailable: {e}");
     }
     let tray_icon = super::tray::create_tray_icon(commands.clone(), ui_wake.clone());
-    let app = DesktopOverlayApp::new(commands, ui_wake, settings_store, devices);
+    let app = DesktopOverlayApp::new(
+        commands,
+        ui_wake,
+        settings_store,
+        super::session_state_store(),
+        devices,
+    );
 
     let mut state = WaylandApp {
         registry_state: RegistryState::new(&globals),

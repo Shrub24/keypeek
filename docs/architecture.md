@@ -16,7 +16,7 @@ The project is a Cargo workspace. Dependencies point one way only: `keypeek-core
 
 1. `keypeek-desktop`'s `main` registers OS-layout support, parses `--config`, and selects a settings store: `FileSettingsStore` for the default location, `ReadOnlySettingsStore` for an explicitly named file.
 2. Discovery runs once at start: HID enumeration is shared with the registered firmware scanners (`discover_devices(scan_all_hid())`), and the resulting device list is handed to the frontend.
-3. The frontend calls `keypeek_desktop::run(settings_store, devices)`, which picks the host and constructs `DesktopOverlayApp`, whose `KeyPeekAppCore` loads settings and owns a `DeviceConnectionManager`.
+3. The frontend calls `keypeek_desktop::run(settings_store, devices)`, which picks the host and constructs `DesktopOverlayApp`, whose `KeyPeekAppCore` loads settings and owns a `DeviceConnectionManager`. If the keyboard used in the previous session is among the discovered devices, the core selects and connects to it right away; a device the user did not choose is never connected automatically.
 4. Connecting a device starts a background session; the session pumps protocol events and applies commands, and wakes the UI through `UiWake` when state changes. The overlay repaints from the domain's layer state rather than from a local simulation.
 
 Devices are not rescanned while running; a device that appears later needs a restart.
@@ -66,6 +66,7 @@ A firmware adapter converts the device's raw binding into a `KeySpec`; the bundl
 Platform differences are confined to narrow ports:
 
 - **`SettingsStore`.** `load`/`save` over INI. `FileSettingsStore` uses the platform config directory (`dev/srwi/KeyPeek` via `directories`); `MemorySettingsStore` backs tests and the browser; `ReadOnlySettingsStore` reads one explicit file, never falls back to the default path, and drops saves, which is what the declarative Nix configuration relies on.
+- **`SessionStateStore`.** `last_device`/`set_last_device` over one line in the platform state directory (`~/.local/state/keypeek/last-device`). Separate from `SettingsStore` because the record is a consequence of use, not configuration: it must be written even when the configuration is a read-only generated file. A successful `ConnectionEvent::Connected` writes it; a failed, locked, or layout-file-pending connection does not. The browser runner uses the in-memory implementation.
 - **`RawHidTransport` and `Reopener`.** The device I/O seam, implemented by `hidapi` natively and by WebHID in the browser.
 - **`OverlayHost`.** Requests of the window host: mouse passthrough and close.
 - **`UiWake`.** The single wake-up channel from background sessions to the UI thread.

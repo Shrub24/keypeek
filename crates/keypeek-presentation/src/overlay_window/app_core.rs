@@ -8,11 +8,12 @@ use super::state::{SettingsState, UiState};
 use super::ui_overlay::OverlayView;
 use crate::key_paint::KeyPaintStyle;
 use crate::keymap_editor::{EditorProfile, EditorState};
+use crate::session_state::SessionStateStore;
 use crate::settings::SettingsStore;
 use keypeek_protocol::connection_manager::{
     ConnectOutcome, ConnectionEvent, DeviceConnectionManager,
 };
-use keypeek_protocol::{DiscoveredDevice, Keyboard, UiWake};
+use keypeek_protocol::{DeviceIdentity, DiscoveredDevice, Keyboard, UiWake};
 
 /// Core state and business logic shared across presentation targets (Desktop and Web).
 ///
@@ -25,21 +26,31 @@ pub struct KeyPeekAppCore {
     pub ui: UiState,
     pub settings: SettingsState,
     pub settings_store: Arc<dyn SettingsStore>,
+    pub session_store: Arc<dyn SessionStateStore>,
     pub connection_mgr: DeviceConnectionManager,
     pub editor: EditorState,
 }
 
 impl KeyPeekAppCore {
-    /// Creates a new `KeyPeekAppCore` with loaded settings and an initialized connection manager.
+    /// Creates a new `KeyPeekAppCore` with loaded settings and an initialized connection manager.    ///
+    /// The keyboard used in the previous session is reconnected when it is present.
     pub fn new(
         ui_wake: UiWake,
         settings_store: Arc<dyn SettingsStore>,
+        session_store: Arc<dyn SessionStateStore>,
         available_devices: Vec<DiscoveredDevice>,
         settings_visible: bool,
     ) -> Self {
         let base_settings = settings_store.load();
+        let mut connection_mgr = DeviceConnectionManager::new(available_devices, ui_wake);
+        let remembered = session_store
+            .last_device()
+            .and_then(|identity| matching_device_index(&connection_mgr, &identity));
+        if let Some(index) = remembered {
+            connection_mgr.select_device(index);
+        }
 
-        Self {
+        let mut core = Self {
             ui: UiState {
                 settings_visible,
                 settings_error: None,
@@ -49,9 +60,18 @@ impl KeyPeekAppCore {
             },
             settings: SettingsState::new(base_settings),
             settings_store,
-            connection_mgr: DeviceConnectionManager::new(available_devices, ui_wake),
+            session_store,
+            connection_mgr,
             editor: EditorState::new(),
+        };
+
+        // Only reconnect to the remembered keyboard; connecting to a device the
+        // user did not choose is worse than starting disconnected.
+        if remembered.is_some() {
+            let _ = core.connect_selected_device();
         }
+
+        core
     }
 
     /// Whether any modal or editor window/sidebar is open.
@@ -171,6 +191,15 @@ impl KeyPeekAppCore {
         }
     }
 
+    /// Records the identity of the keyboard that just connected, so the next start
+    /// reconnects to it.
+    fn remember_connected_device(&self) {
+        if let Some(device) = self.connection_mgr.selected_device() {
+            self.session_store
+                .set_last_device(&DeviceIdentity::from_device(device));
+        }
+    }
+
     /// Schedules a repaint when the overlay visibility timer expires.
     pub fn schedule_overlay_repaint(&self, ctx: &egui::Context) {
         if self.is_any_window_open() {
@@ -208,6 +237,7 @@ impl KeyPeekAppCore {
                 ConnectionEvent::Connected => {
                     self.ui.clear_alerts();
                     self.sync_visual_settings();
+                    self.remember_connected_device();
                 }
                 ConnectionEvent::ConnectionFailed(e) => {
                     self.ui.set_error(e.clone());
@@ -277,16 +307,95 @@ impl KeyPeekAppCore {
     }
 }
 
+/// Index of the discovered device matching `identity`, if one is present.
+fn matching_device_index(
+    manager: &DeviceConnectionManager,
+    identity: &DeviceIdentity,
+) -> Option<usize> {
+    manager
+        .available_devices()
+        .iter()
+        .position(|device| identity.matches(device))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::keymap_editor::EditTarget;
+    use crate::session_state::MemorySessionState;
     use crate::settings::MemorySettingsStore;
 
     fn make_test_core(settings_visible: bool) -> KeyPeekAppCore {
+        make_test_core_with(
+            settings_visible,
+            Vec::new(),
+            Arc::new(MemorySessionState::default()),
+        )
+    }
+
+    fn make_test_core_with(
+        settings_visible: bool,
+        devices: Vec<DiscoveredDevice>,
+        session_store: Arc<dyn SessionStateStore>,
+    ) -> KeyPeekAppCore {
         let ui_wake = UiWake::new(Arc::new(|| {}));
         let store = Arc::new(MemorySettingsStore::default());
-        KeyPeekAppCore::new(ui_wake, store, Vec::new(), settings_visible)
+        KeyPeekAppCore::new(ui_wake, store, session_store, devices, settings_visible)
+    }
+
+    fn test_device(name: &str) -> DiscoveredDevice {
+        DiscoveredDevice {
+            base_name: name.to_string(),
+            vid: 0x1d50,
+            pid: 0x615e,
+            driver_id: "zmk",
+            protocol_label: "ZMK Serial",
+            requires_layout_file: false,
+            spec: keypeek_protocol::test_utils::test_spec(),
+        }
+    }
+
+    #[test]
+    fn a_remembered_keyboard_is_selected_on_start() {
+        let session = Arc::new(MemorySessionState::default());
+        session.set_last_device(&DeviceIdentity::from_device(&test_device("Corne")));
+        let core = make_test_core_with(
+            false,
+            vec![test_device("Lily58"), test_device("Corne")],
+            session,
+        );
+
+        let selected = core
+            .connection_mgr
+            .selected_device()
+            .map(|d| d.base_name.clone());
+        assert_eq!(selected.as_deref(), Some("Corne"));
+    }
+
+    #[test]
+    fn an_absent_remembered_keyboard_leaves_nothing_selected() {
+        let session = Arc::new(MemorySessionState::default());
+        session.set_last_device(&DeviceIdentity::from_device(&test_device("Corne")));
+        let core = make_test_core_with(false, vec![test_device("Lily58")], session);
+
+        assert!(core.connection_mgr.selected_device().is_none());
+        assert!(!core.ui.settings_visible);
+    }
+
+    #[test]
+    fn a_connected_keyboard_is_remembered() {
+        let session = Arc::new(MemorySessionState::default());
+        let mut core = make_test_core_with(false, vec![test_device("Corne")], session.clone());
+        core.connection_mgr.select_device(0);
+
+        core.remember_connected_device();
+
+        let remembered = session.last_device().expect("remembered");
+        assert_eq!(remembered.name, "Corne");
+        assert_eq!(
+            remembered,
+            DeviceIdentity::from_device(&test_device("Corne"))
+        );
     }
 
     #[test]

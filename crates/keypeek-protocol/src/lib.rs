@@ -24,7 +24,9 @@ pub mod test_utils;
 pub use application::{
     connection::{self, ConnectedState, ConnectionRequest, ConnectionTask},
     connection_manager::{self, ConnectionState, DeviceConnectionManager},
-    device_discovery::{self, discover_devices, DeviceDriverScanner, DiscoveredDevice},
+    device_discovery::{
+        self, discover_devices, DeviceDriverScanner, DeviceIdentity, DiscoveredDevice,
+    },
     keyboard::{self, Keyboard},
     session::{self, KeyboardSession},
     ui_wake::{self, UiWake},
