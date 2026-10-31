@@ -38,9 +38,9 @@ Hotkey commands keep their current behaviour — fail with a message and a non-z
 
 `--no-settings` is a flag rather than a config key because it describes how the *process* was started, not user preference, and it must not be persisted.
 
-### The desktop entry uses the same path a user would
+### The argument belongs to the flake's rewrite, not the shared entry
 
-`Exec=keypeek --settings` in `cargo-appimage.desktop`, so the .deb/AppImage and the flake package behave identically, and the flake's rewrite of `Exec` only has to substitute the binary path. The Home Manager service gets `--no-settings` appended to its `ExecStart`.
+The flake package already rewrites `Exec` to point at the store binary, so the settings argument rides along there: `Exec=$out/bin/keypeek --settings`. The shared `cargo-appimage.desktop` keeps a bare `Exec=keypeek`, because packaging that derives its entrypoint from `Exec` — the AppImage's `AppRun` — would take the argument for part of the binary path. Only the Nix package changes behaviour; AppImage and any other consumer of the source file are untouched. The Home Manager service gets `--no-settings` appended to its `ExecStart`.
 
 ## Risks
 

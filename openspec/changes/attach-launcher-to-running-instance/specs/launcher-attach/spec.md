@@ -41,9 +41,13 @@ A started instance SHALL open its settings window only when it did not connect t
 - **WHEN** the instance was started with `--no-settings`
 - **THEN** no settings window opens, whatever the connection state
 
-### Requirement: The packaged launcher uses the attaching invocation
-The installed desktop entry SHALL invoke the settings command rather than a bare start.
+### Requirement: The Nix package's launcher uses the attaching invocation
+The desktop entry installed by the flake package SHALL invoke the settings command rather than a bare start. The shared source entry keeps a bare start, so packaging that derives its entrypoint from `Exec` (the AppImage) is unaffected.
 
 #### Scenario: Reading the installed entry
-- **WHEN** the packaged desktop entry's `Exec` is read
+- **WHEN** the desktop entry installed by the flake package is read
 - **THEN** it runs the binary with the settings argument
+
+#### Scenario: Building the shared source entry
+- **WHEN** `cargo-appimage.desktop` is used directly, without the flake's rewrite
+- **THEN** its `Exec` names only the binary

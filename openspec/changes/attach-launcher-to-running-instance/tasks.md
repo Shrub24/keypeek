@@ -21,9 +21,9 @@
 
 ## 3. Packaging and documentation
 
-- [x] 3.1 Point the desktop entry at the attaching invocation and add `--no-settings` to the generated service.
+- [x] 3.1 Give the Nix package's desktop entry the attaching invocation and pass `--no-settings` from the generated service.
   - refs: `specs/launcher-attach/spec.md`
-  - criteria: The installed entry runs the settings command; the Home Manager unit passes the suppression flag.
+  - criteria: The entry installed by the flake package runs the settings command; the shared source entry stays bare; the Home Manager unit passes the suppression flag.
   - delegate: CoderAgent
   - verify: Evaluate the module and inspect `ExecStart`; install the package and read the entry.
 - [x] 3.2 Document launcher behaviour and the read-only configuration caveat.
