@@ -1,11 +1,11 @@
 ## 1. Placement model
 
-- [ ] 1.1 Replace `margin` with `offset_x`/`offset_y` in the settings model and the anchor mapping.
+- [x] 1.1 Replace `margin` with `offset_x`/`offset_y` in the settings model and the anchor mapping.
   - refs: `specs/overlay-placement/spec.md`, `design.md`
   - criteria: Each anchor applies its own axis direction; negative offsets move outward; constant values are used where an axis has no edge.
   - delegate: CoderAgent
   - verify: Unit tests over all anchors covering sign and magnitude.
-- [ ] 1.2 Serialize the offsets and read `margin` as a fallback.
+- [x] 1.2 Serialize the offsets and read `margin` as a fallback.
   - refs: `specs/overlay-placement/spec.md`
   - criteria: Writing emits only offsets; reading an older file keeps the previous placement.
   - delegate: CoderAgent
@@ -13,7 +13,7 @@
 
 ## 2. Settings window
 
-- [ ] 2.1 Replace the single distance field with one row per axis.
+- [x] 2.1 Replace the single distance field with one row per axis.
   - refs: `specs/overlay-placement/spec.md`
   - criteria: Each field edits only its own axis and explains the inward direction.
   - delegate: CoderAgent
@@ -21,7 +21,7 @@
 
 ## 3. Documentation
 
-- [ ] 3.1 Document the offsets and the legacy `margin` behaviour.
+- [x] 3.1 Document the offsets and the legacy `margin` behaviour.
   - refs: `specs/overlay-placement/spec.md`
   - criteria: The README names the keys and their sign convention.
   - delegate: DocWriter

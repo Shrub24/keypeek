@@ -65,15 +65,21 @@ impl WindowPosition {
         Self::BottomRight,
     ];
 
-    pub fn anchor_and_offset(self, margin: f32) -> (egui::Align2, egui::Vec2) {
+    /// Alignment plus displacement for this anchor.
+    ///
+    /// Each offset is the distance inward from the edge the anchor uses on that
+    /// axis, so a negative value moves the overlay outward, past the edge. The
+    /// three anchors without a horizontal edge treat `offset_x` as a plain
+    /// displacement.
+    pub fn anchor_and_offset(self, offset_x: f32, offset_y: f32) -> (egui::Align2, egui::Vec2) {
         match self {
-            Self::TopLeft => (egui::Align2::LEFT_TOP, egui::vec2(margin, margin)),
-            Self::TopRight => (egui::Align2::RIGHT_TOP, egui::vec2(-margin, margin)),
-            Self::BottomLeft => (egui::Align2::LEFT_BOTTOM, egui::vec2(margin, -margin)),
-            Self::BottomRight => (egui::Align2::RIGHT_BOTTOM, egui::vec2(-margin, -margin)),
-            Self::Bottom => (egui::Align2::CENTER_BOTTOM, egui::vec2(0.0, -margin)),
-            Self::Top => (egui::Align2::CENTER_TOP, egui::vec2(0.0, margin)),
-            Self::Center => (egui::Align2::CENTER_CENTER, egui::Vec2::ZERO),
+            Self::TopLeft => (egui::Align2::LEFT_TOP, egui::vec2(offset_x, offset_y)),
+            Self::TopRight => (egui::Align2::RIGHT_TOP, egui::vec2(-offset_x, offset_y)),
+            Self::BottomLeft => (egui::Align2::LEFT_BOTTOM, egui::vec2(offset_x, -offset_y)),
+            Self::BottomRight => (egui::Align2::RIGHT_BOTTOM, egui::vec2(-offset_x, -offset_y)),
+            Self::Bottom => (egui::Align2::CENTER_BOTTOM, egui::vec2(offset_x, -offset_y)),
+            Self::Top => (egui::Align2::CENTER_TOP, egui::vec2(offset_x, offset_y)),
+            Self::Center => (egui::Align2::CENTER_CENTER, egui::vec2(offset_x, offset_y)),
         }
     }
 }
@@ -292,7 +298,9 @@ pub struct Settings {
     pub position: WindowPosition,
     pub timeout: i64,
     pub activation_delay: u32,
-    pub margin: u32,
+    /// Distance inward from the anchored edge; negative moves past it.
+    pub offset_x: i32,
+    pub offset_y: i32,
     pub visible_layers: LayerMask,
     pub theme: ThemeSettings,
     pub legend_mode: LegendMode,
@@ -311,7 +319,8 @@ impl Default for Settings {
             position: WindowPosition::BottomRight,
             timeout: 2000,
             activation_delay: 0,
-            margin: 10,
+            offset_x: 10,
+            offset_y: 10,
             visible_layers: LayerMask::ALL,
             theme: ThemeSettings::default(),
             legend_mode: LegendMode::Stacked,
@@ -353,7 +362,8 @@ impl Settings {
         section.set("position", self.position.to_string());
         section.set("timeout", self.timeout.to_string());
         section.set("activation_delay", self.activation_delay.to_string());
-        section.set("margin", self.margin.to_string());
+        section.set("offset_x", self.offset_x.to_string());
+        section.set("offset_y", self.offset_y.to_string());
         section.set("visible_layers", self.visible_layers.to_string());
         for (index, color) in self.theme.layer_colors.iter().enumerate() {
             section.set(format!("layer_color_{index}"), color.to_string());
@@ -401,8 +411,18 @@ impl Settings {
             let parsed = val.parse::<u32>().unwrap_or(s.activation_delay);
             s.activation_delay = parsed.min(Self::MAX_ACTIVATION_DELAY_MS);
         }
+        // `margin` is the pre-offset single inset; keep honouring it so an older
+        // file keeps its placement.
         if let Some(val) = section.get("margin") {
-            s.margin = val.parse().unwrap_or(s.margin);
+            let margin = val.parse().unwrap_or(s.offset_x);
+            s.offset_x = margin;
+            s.offset_y = margin;
+        }
+        if let Some(val) = section.get("offset_x") {
+            s.offset_x = val.parse().unwrap_or(s.offset_x);
+        }
+        if let Some(val) = section.get("offset_y") {
+            s.offset_y = val.parse().unwrap_or(s.offset_y);
         }
         if let Some(val) = section.get("visible_layers") {
             s.visible_layers = val.parse().unwrap_or(s.visible_layers);
@@ -592,7 +612,8 @@ mod tests {
             position: WindowPosition::TopLeft,
             timeout: 3500,
             activation_delay: 200,
-            margin: 25,
+            offset_x: 25,
+            offset_y: 4,
             visible_layers: LayerMask(0x0000000f),
             legend_mode: LegendMode::SingleLive,
             ..Default::default()
@@ -690,6 +711,53 @@ mod tests {
         let primary = Settings::default();
         let parsed = Settings::from_ini_str(&primary.to_ini_string()).expect("parse");
         assert_eq!(parsed.monitor, MonitorSelection::Primary);
+    }
+
+    #[test]
+    fn offsets_apply_inward_per_axis() {
+        use WindowPosition::*;
+        let cases = [
+            (TopLeft, (40.0, 12.0)),
+            (TopRight, (-40.0, 12.0)),
+            (BottomLeft, (40.0, -12.0)),
+            (BottomRight, (-40.0, -12.0)),
+            (Bottom, (40.0, -12.0)),
+            (Top, (40.0, 12.0)),
+            (Center, (40.0, 12.0)),
+        ];
+        for (position, expected) in cases {
+            let (_, offset) = position.anchor_and_offset(40.0, 12.0);
+            assert_eq!((offset.x, offset.y), expected, "anchor {position:?}");
+        }
+    }
+
+    #[test]
+    fn negative_offsets_move_outward() {
+        let (align, offset) = WindowPosition::BottomRight.anchor_and_offset(-10.0, -5.0);
+        assert_eq!(align, egui::Align2::RIGHT_BOTTOM);
+        assert_eq!((offset.x, offset.y), (10.0, 5.0));
+    }
+
+    #[test]
+    fn legacy_margin_sets_both_offsets() {
+        let legacy = "[settings]\nposition = BottomRight\nmargin = 33\n";
+        let parsed = Settings::from_ini_str(legacy).expect("parse");
+        assert_eq!((parsed.offset_x, parsed.offset_y), (33, 33));
+    }
+
+    #[test]
+    fn offsets_win_over_a_stale_margin() {
+        let text = "[settings]\nmargin = 33\noffset_x = 7\noffset_y = 2\n";
+        let parsed = Settings::from_ini_str(text).expect("parse");
+        assert_eq!((parsed.offset_x, parsed.offset_y), (7, 2));
+    }
+
+    #[test]
+    fn saving_emits_offsets_not_margin() {
+        let text = Settings::default().to_ini_string();
+        assert!(text.contains("offset_x"));
+        assert!(text.contains("offset_y"));
+        assert!(!text.contains("margin"));
     }
 
     #[test]

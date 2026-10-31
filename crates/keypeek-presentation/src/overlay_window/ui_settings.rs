@@ -272,12 +272,27 @@ impl DesktopOverlayApp {
                             );
                             ui.end_row();
 
-                            ui.label("Distance from screen edge");
+                            ui.label("Horizontal offset");
                             ui.add_sized(
                                 ui.available_size(),
-                                egui::DragValue::new(&mut self.settings.draft.margin)
+                                egui::DragValue::new(&mut self.settings.draft.offset_x)
                                     .speed(1)
                                     .suffix(" px"),
+                            )
+                            .on_hover_text(
+                                "Distance inward from the anchored edge; negative moves past it",
+                            );
+                            ui.end_row();
+
+                            ui.label("Vertical offset");
+                            ui.add_sized(
+                                ui.available_size(),
+                                egui::DragValue::new(&mut self.settings.draft.offset_y)
+                                    .speed(1)
+                                    .suffix(" px"),
+                            )
+                            .on_hover_text(
+                                "Distance inward from the anchored edge; negative moves past it",
                             );
                             ui.end_row();
 

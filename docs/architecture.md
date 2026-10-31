@@ -76,4 +76,4 @@ Native specifics: the Wayland host builds a wlr-layer-shell surface anchored to 
 
 ## Settings
 
-Settings cover window size and position, the target output, timeout (including an infinite setting), margin, activation delay, the visible-layer mask, legend mode, font size multiplier, ellipsis behaviour, the font colour, and per-layer theme colours. The settings window edits a draft and commits it to the active settings; persistence goes through the store, so a read-only store makes the window's changes session-only.
+Settings cover window size, the anchor and the two per-axis offsets that place it, the target output, timeout (including an infinite setting), activation delay, the visible-layer mask, legend mode, font size multiplier, ellipsis behaviour, the font colour, and per-layer theme colours. Offsets are inward distances from the edge the anchor uses on each axis, and a negative value moves the overlay past that edge; a `margin` key from an older file is read as both offsets. The settings window edits a draft and commits it to the active settings; persistence goes through the store, so a read-only store makes the window's changes session-only.

@@ -84,10 +84,10 @@ impl DesktopOverlayApp {
     }
 
     pub(super) fn get_anchor_params(&self) -> (egui::Align2, egui::Vec2) {
-        self.settings
-            .active
-            .position
-            .anchor_and_offset(self.settings.active.margin as f32)
+        self.settings.active.position.anchor_and_offset(
+            self.settings.active.offset_x as f32,
+            self.settings.active.offset_y as f32,
+        )
     }
 
     pub(super) fn overlay_visible(&self) -> bool {

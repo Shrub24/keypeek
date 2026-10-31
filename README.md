@@ -163,6 +163,18 @@ On a multi-monitor setup, choose the display the overlay appears on under *Align
 
 This applies to native Wayland sessions, where the overlay is a layer surface. On X11 the overlay stays on the primary display and the settings window says that output names are unavailable.
 
+### Placement
+
+The overlay is placed by an *Alignment* anchor (a corner, an edge midpoint, or the centre) plus two offsets, measured inward from the edge that anchor uses on each axis. A negative offset moves the overlay past that edge, which is how you tuck it half off-screen.
+
+```ini
+position = BottomRight
+offset_x = 40
+offset_y = 12
+```
+
+Each axis is independent: 40 px in from the right and 12 px up from the bottom. An older file with a single `margin` key still loads, and applies that value to both offsets.
+
 ### Keymap Editor
 
 While the settings window is open, clicking any key on the overlay opens the key editor. From there keycodes and behaviors can be selected from categorized lists or found using the search bar. You can switch between layers using the buttons at the top of the editor or click another key on the overlay to change the selection. Key changes are sent directly to the keyboard over the connection.
