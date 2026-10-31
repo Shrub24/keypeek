@@ -124,6 +124,32 @@ KERNEL=="hidraw*", ATTRS{modalias}=="hid:b0005g0001v00001D50p0000615E", TAG+="ua
 
 On NixOS, add the package to `services.udev.packages`. On other distributions with system-manager, the `systemManagerModules.default` flake output links the packaged rule into `/etc/udev/rules.d`; on any other system, copy the rule from the package into `/etc/udev/rules.d/` manually. Rules are only evaluated when a device appears, so unplug and replug the keyboard (or run `udevadm control --reload && udevadm trigger`) after installing or changing a rule.
 
+### Declarative setup (Nix)
+
+The flake exports `homeManagerModules.default` with a `programs.keypeek` option set:
+
+```nix
+programs.keypeek = {
+  enable = true;
+  settings = {
+    size = 80;
+    position = "Bottom Right";
+    offset_x = 40;
+    offset_y = 12;
+    monitor = "DP-2";
+  };
+  service.enable = true;
+};
+```
+
+`settings` become the `[settings]` section of a generated INI file that only the bundled systemd user service reads, via `--config`. That mode is read-only: KeyPeek never writes the file back, so a settings window opened from the launcher changes the running instance for that session only. Setting `settings` without `service.enable` does nothing; the module warns about it.
+
+The service starts with `--no-settings`, so it never opens a window on its own. It needs the session environment to reach the compositor; `uwsm` and most compositor setups export it into the systemd user manager. If yours does not, name the variables:
+
+```nix
+programs.keypeek.service.environment = { WAYLAND_DISPLAY = "wayland-1"; };
+```
+
 ## Usage
 
 <img src=".github/assets/edit_key_window.png" alt="Key editor screenshot" width="100%">
