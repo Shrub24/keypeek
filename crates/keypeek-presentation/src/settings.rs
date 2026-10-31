@@ -456,6 +456,32 @@ pub struct FileSettingsStore {
     custom_path: Option<PathBuf>,
 }
 
+/// Settings store backed by an explicitly chosen file that is never written to.
+///
+/// The file is authoritative: loading it does not fall back to the default
+/// configuration path, and saves are ignored. Used for declaratively generated
+/// configuration (for example a Nix store path), which the process may not own.
+#[derive(Clone, Debug)]
+pub struct ReadOnlySettingsStore {
+    path: PathBuf,
+}
+
+impl ReadOnlySettingsStore {
+    pub fn new(path: impl Into<PathBuf>) -> Self {
+        Self { path: path.into() }
+    }
+}
+
+impl SettingsStore for ReadOnlySettingsStore {
+    fn load(&self) -> Settings {
+        Settings::load_from_file(&self.path).unwrap_or_default()
+    }
+
+    fn save(&self, _settings: &Settings) -> Result<(), String> {
+        Ok(())
+    }
+}
+
 impl FileSettingsStore {
     pub fn new(path: impl Into<PathBuf>) -> Self {
         Self {
@@ -576,5 +602,39 @@ mod tests {
 
         let _ = fs::remove_file(&file_path);
         let _ = fs::remove_dir(&temp_dir);
+    }
+
+    #[test]
+    fn test_read_only_store_loads_explicit_file_and_ignores_saves() {
+        let temp_dir = std::env::temp_dir().join(format!("keypeek_ro_{}", std::process::id()));
+        fs::create_dir_all(&temp_dir).expect("temp dir");
+        let file_path = temp_dir.join("generated.ini");
+
+        let settings = Settings {
+            size: 42,
+            ..Default::default()
+        };
+        settings.save_to_file(&file_path).expect("write fixture");
+        let original = fs::read_to_string(&file_path).expect("read fixture");
+
+        let store = ReadOnlySettingsStore::new(&file_path);
+        assert_eq!(store.load().size, 42);
+
+        store
+            .save(&Settings {
+                size: 99,
+                ..Default::default()
+            })
+            .expect("saves are accepted and dropped");
+        assert_eq!(fs::read_to_string(&file_path).expect("reread"), original);
+        assert_eq!(store.load().size, 42);
+
+        let _ = fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn test_read_only_store_does_not_fall_back_to_default_path() {
+        let store = ReadOnlySettingsStore::new("/nonexistent/keypeek/generated.ini");
+        assert_eq!(store.load(), Settings::default());
     }
 }
