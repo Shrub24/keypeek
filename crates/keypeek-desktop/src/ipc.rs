@@ -5,15 +5,25 @@
 //! hide, or reset the overlay without knowing anything about QMK, ZMK, or the
 //! UI. See `docs/roadmap.md` for why this is not D-Bus.
 
-use std::io::{BufRead, BufReader, ErrorKind, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::thread;
+use std::time::Duration;
 
 use keypeek_presentation::{CommandQueue, OverlayCommand};
 use keypeek_protocol::UiWake;
+
+/// How long a client may hold the connection without sending its command.
+/// Without this a stalled client blocks every later command, since one
+/// connection is handled at a time.
+const READ_TIMEOUT: Duration = Duration::from_millis(250);
+
+/// Upper bound on the bytes read from a client, so a stream that never sends
+/// a newline cannot grow the buffer without limit.
+const MAX_COMMAND_BYTES: u64 = 1024;
 
 /// Path of the control socket of the running instance.
 pub fn socket_path() -> PathBuf {
@@ -49,6 +59,7 @@ fn spawn_at(
     let listener = bind(&path)?;
     thread::spawn(move || {
         for stream in listener.incoming().flatten() {
+            let _ = stream.set_read_timeout(Some(READ_TIMEOUT));
             handle(stream, &commands, &ui_wake);
         }
     });
@@ -82,7 +93,10 @@ fn bind(path: &Path) -> std::io::Result<UnixListener> {
 
 fn handle(stream: UnixStream, commands: &CommandQueue, ui_wake: &UiWake) {
     let mut line = String::new();
-    if BufReader::new(&stream).read_line(&mut line).is_err() {
+    if BufReader::new(std::io::Read::take(stream, MAX_COMMAND_BYTES))
+        .read_line(&mut line)
+        .is_err()
+    {
         return;
     }
     if let Some(command) = OverlayCommand::parse(&line) {
@@ -120,6 +134,21 @@ mod tests {
             thread::sleep(Duration::from_millis(5));
         }
         received
+    }
+
+    #[test]
+    fn a_stalled_client_does_not_block_the_next_command() {
+        let path = temp_socket("stalled.sock");
+        let commands = Arc::new(CommandQueue::default());
+        let ui_wake = UiWake::new(Arc::new(|| {}));
+        spawn_at(path.clone(), commands.clone(), ui_wake).expect("bind");
+
+        // Connect and send nothing: the listener must not wait on this forever.
+        let _stalled = UnixStream::connect(&path).expect("connect");
+        let mut sender = UnixStream::connect(&path).expect("connect");
+        sender.write_all(b"toggle\n").expect("write");
+
+        assert_eq!(wait_for(&commands), vec![OverlayCommand::Toggle]);
     }
 
     #[test]
