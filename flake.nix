@@ -199,20 +199,29 @@
             modules = [
               self.homeManagerModules.default
               {
-                options.home.packages = lib.mkOption {
-                  type = lib.types.listOf lib.types.package;
-                  default = [];
-                };
-                options.systemd.user.services = lib.mkOption {
-                  type = lib.types.attrsOf lib.types.anything;
-                  default = {};
+                options = {
+                  home.packages = lib.mkOption {
+                    type = lib.types.listOf lib.types.package;
+                    default = [];
+                  };
+                  systemd.user.services = lib.mkOption {
+                    type = lib.types.attrsOf lib.types.anything;
+                    default = {};
+                  };
+                  warnings = lib.mkOption {
+                    type = lib.types.listOf lib.types.str;
+                    default = [];
+                  };
                 };
               }
               {
                 programs.keypeek = {
                   enable = true;
                   settings.size = 80;
-                  service.enable = true;
+                  service = {
+                    enable = true;
+                    environment.WAYLAND_DISPLAY = "wayland-1";
+                  };
                 };
               }
             ];
@@ -222,6 +231,7 @@
           ''
             test -n "${toString (lib.length evaled.config.home.packages)}"
             test -e "$(echo ${evaled.config.systemd.user.services.keypeek.Service.ExecStart} | cut -d' ' -f1)"
+            test -n "${toString (lib.length evaled.config.systemd.user.services.keypeek.Service.Environment)}"
             touch $out
           '';
 
@@ -331,10 +341,29 @@
             '';
           };
 
-          service.enable = lib.mkEnableOption "the KeyPeek systemd user service";
+          service = {
+            enable = lib.mkEnableOption "the KeyPeek systemd user service";
+
+            environment = lib.mkOption {
+              type = lib.types.attrsOf lib.types.str;
+              default = {};
+              example = {WAYLAND_DISPLAY = "wayland-1";};
+              description = ''
+                Extra environment variables for the service. A systemd user
+                service sees the session environment only when the compositor
+                exports it (uwsm and most wlroots setups do; a bare session
+                start may not), and KeyPeek needs `WAYLAND_DISPLAY` to reach
+                the compositor and `DISPLAY` for its X11 fallback.
+              '';
+            };
+          };
         };
 
         config = lib.mkIf cfg.enable {
+          warnings =
+            lib.optional (cfg.settings != {} && !cfg.service.enable)
+            "programs.keypeek.settings only takes effect through the bundled service; set programs.keypeek.service.enable = true or pass --config yourself.";
+
           home.packages = [cfg.package];
 
           systemd.user.services.keypeek = lib.mkIf cfg.service.enable {
@@ -347,6 +376,9 @@
               ExecStart =
                 "${lib.getExe cfg.package} --no-settings"
                 + lib.optionalString (cfg.settings != {}) " --config ${configFile}";
+              Environment =
+                lib.mapAttrsToList (name: value: "${name}=${value}")
+                cfg.service.environment;
               Restart = "on-failure";
               RestartSec = 2;
             };
