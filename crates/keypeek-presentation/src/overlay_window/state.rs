@@ -7,6 +7,8 @@ pub struct UiState {
     pub settings_error: Option<String>,
     pub settings_warning: Option<String>,
     pub overlay_override: OverlayOverride,
+    /// Outputs reported by the platform, offered as overlay targets.
+    pub available_monitors: Vec<String>,
 }
 
 impl UiState {

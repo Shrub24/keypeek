@@ -11,6 +11,38 @@ use std::sync::RwLock;
 #[derive(Debug)]
 pub struct ParseSettingsError;
 
+/// Output the overlay is shown on.
+///
+/// Persisted by name rather than index: indices shift when a display is
+/// plugged in or reordered, names do not.
+#[derive(Clone, PartialEq, Eq, Debug, Default)]
+pub enum MonitorSelection {
+    /// Let the display server pick (Wayland has no primary-output flag).
+    #[default]
+    Primary,
+    Named(String),
+}
+
+impl fmt::Display for MonitorSelection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Primary => write!(f, "Primary"),
+            Self::Named(name) => write!(f, "{name}"),
+        }
+    }
+}
+
+impl FromStr for MonitorSelection {
+    type Err = ParseSettingsError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        Ok(match value {
+            "" | "Primary" => Self::Primary,
+            name => Self::Named(name.to_string()),
+        })
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum WindowPosition {
     TopLeft,
@@ -264,6 +296,7 @@ pub struct Settings {
     pub visible_layers: LayerMask,
     pub theme: ThemeSettings,
     pub legend_mode: LegendMode,
+    pub monitor: MonitorSelection,
 }
 
 impl Default for Settings {
@@ -282,6 +315,7 @@ impl Default for Settings {
             visible_layers: LayerMask::ALL,
             theme: ThemeSettings::default(),
             legend_mode: LegendMode::Stacked,
+            monitor: MonitorSelection::default(),
         }
     }
 }
@@ -326,6 +360,7 @@ impl Settings {
         }
         section.set("font_color", self.theme.font_color.to_string());
         section.set("legend_mode", self.legend_mode.to_string());
+        section.set("monitor", self.monitor.to_string());
         conf
     }
 
@@ -387,6 +422,11 @@ impl Settings {
         if let Some(val) = section.get("legend_mode") {
             if let Ok(parsed) = val.parse() {
                 s.legend_mode = parsed;
+            }
+        }
+        if let Some(val) = section.get("monitor") {
+            if let Ok(parsed) = val.parse() {
+                s.monitor = parsed;
             }
         }
         Some(s)
@@ -636,5 +676,31 @@ mod tests {
     fn test_read_only_store_does_not_fall_back_to_default_path() {
         let store = ReadOnlySettingsStore::new("/nonexistent/keypeek/generated.ini");
         assert_eq!(store.load(), Settings::default());
+    }
+
+    #[test]
+    fn monitor_selection_round_trips_through_ini() {
+        let settings = Settings {
+            monitor: MonitorSelection::Named("DP-1".to_string()),
+            ..Default::default()
+        };
+        let parsed = Settings::from_ini_str(&settings.to_ini_string()).expect("parse");
+        assert_eq!(parsed.monitor, MonitorSelection::Named("DP-1".to_string()));
+
+        let primary = Settings::default();
+        let parsed = Settings::from_ini_str(&primary.to_ini_string()).expect("parse");
+        assert_eq!(parsed.monitor, MonitorSelection::Primary);
+    }
+
+    #[test]
+    fn monitor_selection_parses_any_non_primary_name() {
+        let parsed: MonitorSelection = "HDMI-A-1".parse().expect("named output");
+        assert_eq!(parsed, MonitorSelection::Named("HDMI-A-1".to_string()));
+
+        let empty: MonitorSelection = "".parse().expect("empty is primary");
+        assert_eq!(empty, MonitorSelection::Primary);
+
+        let primary: MonitorSelection = "Primary".parse().expect("primary");
+        assert_eq!(primary, MonitorSelection::Primary);
     }
 }

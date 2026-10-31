@@ -102,6 +102,14 @@ impl DesktopOverlayApp {
         self.mouse_passthrough = Some(mouse_passthrough);
     }
 
+    /// Forgets the last applied passthrough state so the next update re-applies it.
+    ///
+    /// Hosts call this when they replace the overlay surface, since a new surface
+    /// does not inherit the old input region.
+    pub fn forget_passthrough(&mut self) {
+        self.mouse_passthrough = None;
+    }
+
     /// Updates state, handles background tasks, and processes input before drawing.
     pub fn update(&mut self, ctx: &egui::Context, host: &mut dyn OverlayHost) {
         for command in self.commands.drain() {

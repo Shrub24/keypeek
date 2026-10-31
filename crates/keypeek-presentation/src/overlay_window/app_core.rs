@@ -45,6 +45,7 @@ impl KeyPeekAppCore {
                 settings_error: None,
                 settings_warning: None,
                 overlay_override: OverlayOverride::default(),
+                available_monitors: Vec::new(),
             },
             settings: SettingsState::new(base_settings),
             settings_store,
@@ -159,6 +160,15 @@ impl KeyPeekAppCore {
             .ui
             .overlay_override
             .apply(command, self.is_overlay_visible());
+    }
+
+    /// Records the outputs the platform offers as overlay targets.
+    pub fn set_available_monitors(&mut self, mut monitors: Vec<String>) {
+        monitors.sort();
+        monitors.dedup();
+        if self.ui.available_monitors != monitors {
+            self.ui.available_monitors = monitors;
+        }
     }
 
     /// Schedules a repaint when the overlay visibility timer expires.

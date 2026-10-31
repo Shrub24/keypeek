@@ -1,6 +1,8 @@
 use super::DesktopOverlayApp;
 use crate::overlay_host::OverlayHost;
-use crate::settings::{LayerMask, LegendMode, Settings, ThemeColor, ThemeSettings, WindowPosition};
+use crate::settings::{
+    LayerMask, LegendMode, MonitorSelection, Settings, ThemeColor, ThemeSettings, WindowPosition,
+};
 use crate::ui_widgets::{github_link, titled_group, version_link};
 use egui::Window;
 
@@ -211,6 +213,31 @@ impl DesktopOverlayApp {
                                         );
                                     }
                                 });
+                            ui.end_row();
+
+                            ui.label("Monitor");
+                            let monitors = self.ui.available_monitors.clone();
+                            egui::ComboBox::from_id_salt("monitor_combo")
+                                .width(ui.available_width())
+                                .selected_text(self.settings.draft.monitor.to_string())
+                                .show_ui(ui, |ui| {
+                                    ui.selectable_value(
+                                        &mut self.settings.draft.monitor,
+                                        MonitorSelection::Primary,
+                                        "Primary",
+                                    );
+                                    for name in monitors {
+                                        let value = MonitorSelection::Named(name.clone());
+                                        ui.selectable_value(
+                                            &mut self.settings.draft.monitor,
+                                            value,
+                                            name,
+                                        );
+                                    }
+                                });
+                            if self.ui.available_monitors.is_empty() {
+                                ui.small("This display server does not report output names.");
+                            }
                             ui.end_row();
 
                             ui.label("Display duration");

@@ -11,8 +11,8 @@ Features land as one atomic change per concern, in the approved sequence below. 
 - **Foundation — `establish-downstream-foundation`.** Record the architecture, engineering posture, workflow, and roadmap before independent feature work begins.
 - **First feature change — `integrate-native-nix-support`.** Complete desktop and BLE permission packaging, then export Home Manager and system-manager modules.
 - **Subsequent changes, in order:**
-  - `add-declarative-overlay-service`
-  - `add-output-selection`
+  - `add-declarative-overlay-service` — landed: local show/hide control over a command socket, plus tray entries and the `--toggle` family.
+  - `add-output-selection` — landed: the overlay is bound to a chosen output and retargets live.
   - `add-device-profiles-and-autoconnect`
 
 ## Withdrawn and re-scoped changes
@@ -28,7 +28,7 @@ Decisions by source:
 
 - **Upstream issue #28, pull requests #35 and #38.** Custom behavior rendering, OS-layout-aware labels, and single-legend mode are all present, so `render-custom-zmk-behaviors` is withdrawn.
 - **dan-dr / issue #25 (exact identity, saved connection, auto-connect/reconnect).** Adopted as concepts and reimplemented in the later `add-device-profiles-and-autoconnect` change. The full branch is rejected — its merge base predates the keymap editor and its discovery work is fuzzy.
-- **PR #49 (overlay monitor selection).** Open against master but conflicting as of 0.11.0 (it predates the crate split; a Linux/macOS variant, #47, and a Windows variant, #51, are closed). `add-output-selection` therefore takes the concepts — bind the layer surface to a named output, persist the choice by display name — and implements them against `crates/keypeek-desktop/src/wayland`.
+- **PR #49 (overlay monitor selection).** Open against master but conflicting as of 0.11.0 (it predates the crate split; a Linux/macOS variant, #47, and a Windows variant, #51, are closed). `add-output-selection` takes the concepts — bind the layer surface to a named output, persist the choice by display name, prime the surface so the compositor reports scale — and adds live retargeting, which the pull request lacks for Wayland. Its eframe/winit monitor handling is not ported: the layer-shell path is the one in use, and those hosts keep showing the overlay on the primary display.
 - **PR #17 (IPC/CLI control).** Open and conflicting, bundling `--toggle`/`--settings` with unrelated keyboard work. Only the toggle and settings-request concepts are reimplemented, in `add-declarative-overlay-service`.
 - **PR #29 (Vial layout options).** Deferred until a local need appears; upstream progress is tracked in the meantime.
 - **PR #30 (layout-aware labels).** Closed, with its behaviour superseded upstream by #35.

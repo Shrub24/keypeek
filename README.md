@@ -153,6 +153,10 @@ bind = SUPER, K, exec, keypeek --toggle
 
 The override lasts until it is changed again and is not written to `settings.ini`, so a declarative configuration stays authoritative. A settings or key editor window always keeps the overlay visible, because the editor selects keys by clicking them.
 
+On a multi-monitor setup, choose the display the overlay appears on under *Alignment → Monitor*. The choice is stored by output name, so it survives restarts and display renumbering; `Primary` leaves the choice to the display server. Changing it moves the running overlay immediately.
+
+This applies to native Wayland sessions, where the overlay is a layer surface. On X11 the overlay stays on the primary display and the settings window says that output names are unavailable.
+
 ### Keymap Editor
 
 While the settings window is open, clicking any key on the overlay opens the key editor. From there keycodes and behaviors can be selected from categorized lists or found using the search bar. You can switch between layers using the buttons at the top of the editor or click another key on the overlay to change the selection. Key changes are sent directly to the keyboard over the connection.

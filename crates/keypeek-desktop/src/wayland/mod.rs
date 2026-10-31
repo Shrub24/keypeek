@@ -50,7 +50,8 @@ use wayland_client::{
 use egui_glow::glow;
 
 use keypeek_presentation::{
-    add_phosphor_to_fonts, CommandQueue, DesktopOverlayApp, OverlayHost, SettingsStore,
+    add_phosphor_to_fonts, settings::MonitorSelection, CommandQueue, DesktopOverlayApp,
+    OverlayHost, SettingsStore,
 };
 use keypeek_protocol::{DiscoveredDevice, UiWake};
 
@@ -80,11 +81,18 @@ struct WaylandApp {
     output_state: OutputState,
     seat_state: SeatState,
     compositor_state: CompositorState,
+    shell: LayerShell,
+    qh: QueueHandle<WaylandApp>,
+    viewporter: Option<WpViewporter>,
+    fractional_manager: Option<WpFractionalScaleManagerV1>,
 
-    layer: LayerSurface,
+    /// `None` until the first surface is bound; retargeting replaces it.
+    layer: Option<LayerSurface>,
     /// Maps the buffer to the logical surface size under fractional scaling;
     /// `None` when the compositor lacks wp-fractional-scale/wp-viewporter.
     viewport: Option<WpViewport>,
+    /// Output the surface is bound to; `None` lets the compositor choose.
+    applied_output: Option<String>,
     keyboard: Option<WlKeyboard>,
     pointer: Option<WlPointer>,
 
@@ -103,6 +111,9 @@ struct WaylandApp {
     scale: f64,
 
     configured: bool,
+    /// First frame with a buffer committed; the compositor only sends
+    /// `preferred_scale` and a configure after that.
+    primed: bool,
     needs_redraw: bool,
     exit: bool,
     repaint_at: Option<Instant>,
@@ -113,21 +124,11 @@ pub fn run(
     devices: Vec<DiscoveredDevice>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let conn = Connection::connect_to_env()?;
-    let (globals, event_queue) = registry_queue_init::<WaylandApp>(&conn)?;
+    let (globals, mut event_queue) = registry_queue_init::<WaylandApp>(&conn)?;
     let qh = event_queue.handle();
 
     let compositor_state = CompositorState::bind(&globals, &qh)?;
     let shell = LayerShell::bind(&globals, &qh)?;
-
-    // Build the overlay layer surface: above everything, covering the whole output,
-    // initially interactive because the settings window opens on first launch.
-    let surface = compositor_state.create_surface(&qh);
-    let layer = shell.create_layer_surface(&qh, surface, Layer::Overlay, Some("keypeek"), None);
-    layer.set_anchor(Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT);
-    layer.set_exclusive_zone(-1);
-    layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
-    layer.set_size(0, 0); // 0,0 + all-edge anchors => compositor sizes it to the output
-    layer.commit();
 
     // Fractional scaling needs both protocols: the scale event and a viewport to
     // map the scaled buffer back to the logical size. Otherwise integer scale.
@@ -137,20 +138,10 @@ pub fn run(
     let fractional_manager = globals
         .bind::<WpFractionalScaleManagerV1, WaylandApp, _>(&qh, 1..=1, ())
         .ok();
-    let viewport = match (&viewporter, &fractional_manager) {
-        (Some(viewporter), Some(manager)) => {
-            manager.get_fractional_scale(layer.wl_surface(), &qh, ());
-            Some(viewporter.get_viewport(layer.wl_surface(), &qh, ()))
-        }
-        _ => None,
-    };
 
     // calloop loop, plus a ping the worker threads use to request repaints.
     let mut event_loop: EventLoop<WaylandApp> = EventLoop::try_new()?;
     let loop_handle = event_loop.handle();
-    WaylandSource::new(conn.clone(), event_queue)
-        .insert(loop_handle.clone())
-        .map_err(|e| format!("failed to insert Wayland event source: {e}"))?;
 
     let (ping, ping_source) = make_ping()?;
     loop_handle
@@ -178,8 +169,13 @@ pub fn run(
         output_state: OutputState::new(&globals, &qh),
         seat_state: SeatState::new(&globals, &qh),
         compositor_state,
-        layer,
-        viewport,
+        shell,
+        qh,
+        viewporter,
+        fractional_manager,
+        layer: None,
+        viewport: None,
+        applied_output: None,
         keyboard: None,
         pointer: None,
         egui_ctx,
@@ -193,10 +189,22 @@ pub fn run(
         height: 0,
         scale: 1.0,
         configured: false,
+        primed: false,
         needs_redraw: false,
         exit: false,
         repaint_at: None,
     };
+
+    // One roundtrip so output names are known before the surface is bound; the
+    // overlay follows the configured output from its first frame.
+    event_queue.roundtrip(&mut state)?;
+    state.update_available_monitors();
+    let initial = target_output_name(&state.app.settings.active.monitor).map(str::to_string);
+    state.bind_overlay(initial.as_deref());
+
+    WaylandSource::new(conn.clone(), event_queue)
+        .insert(loop_handle.clone())
+        .map_err(|e| format!("failed to insert Wayland event source: {e}"))?;
 
     while !state.exit {
         // Sleep until the next scheduled repaint; wake immediately when a redraw is
@@ -219,12 +227,115 @@ pub fn run(
         if state.needs_redraw && state.configured {
             state.draw(&conn);
         }
+
+        // A new monitor choice applies to the running overlay, not just the next start.
+        let target = target_output_name(&state.app.settings.active.monitor).map(str::to_string);
+        if target.as_deref() != state.applied_output.as_deref() {
+            state.bind_overlay(target.as_deref());
+        }
     }
 
     Ok(())
 }
 
+/// Output name the overlay should be bound to, or `None` to let the compositor choose.
+fn target_output_name(selection: &MonitorSelection) -> Option<&str> {
+    match selection {
+        MonitorSelection::Primary => None,
+        MonitorSelection::Named(name) => Some(name.as_str()),
+    }
+}
+
 impl WaylandApp {
+    fn layer(&self) -> &LayerSurface {
+        self.layer.as_ref().expect("layer surface bound")
+    }
+
+    fn output_for_name(&self, name: &str) -> Option<WlOutput> {
+        self.output_state.outputs().find(|output| {
+            self.output_state
+                .info(output)
+                .and_then(|info| info.name)
+                .is_some_and(|output_name| output_name == name)
+        })
+    }
+
+    /// Output names the compositor reports, for the settings window.
+    fn update_available_monitors(&mut self) {
+        let names = self.output_names();
+        self.app.set_available_monitors(names);
+    }
+
+    /// Binds the overlay to `name`, rebuilding the layer surface and its GL state.
+    ///
+    /// The output of a layer surface is fixed when it is created, so following a
+    /// new setting means replacing the surface. `None` lets the compositor choose.
+    fn bind_overlay(&mut self, name: Option<&str>) {
+        self.painter = None;
+        self.gl = None;
+        self.egl = None;
+        self.configured = false;
+        self.primed = false;
+        if let Some(viewport) = self.viewport.take() {
+            viewport.destroy();
+        }
+        if let Some(layer) = self.layer.take() {
+            layer.wl_surface().destroy();
+        }
+
+        let output = name.and_then(|name| self.output_for_name(name));
+        if let Some(info) = output
+            .as_ref()
+            .and_then(|output| self.output_state.info(output))
+        {
+            if info.scale_factor > 0 {
+                self.scale = info.scale_factor as f64;
+            }
+        }
+
+        // Above everything, covering the whole output, interactive because the
+        // settings window opens on first launch.
+        let surface = self.compositor_state.create_surface(&self.qh);
+        let layer = self.shell.create_layer_surface(
+            &self.qh,
+            surface,
+            Layer::Overlay,
+            Some("keypeek"),
+            output.as_ref(),
+        );
+        layer.set_anchor(Anchor::TOP | Anchor::BOTTOM | Anchor::LEFT | Anchor::RIGHT);
+        layer.set_exclusive_zone(-1);
+        layer.set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
+        layer.set_size(0, 0); // 0,0 + all-edge anchors => compositor sizes it to the output
+        layer.commit();
+
+        self.viewport = match (&self.viewporter, &self.fractional_manager) {
+            (Some(viewporter), Some(manager)) => {
+                manager.get_fractional_scale(layer.wl_surface(), &self.qh, ());
+                Some(viewporter.get_viewport(layer.wl_surface(), &self.qh, ()))
+            }
+            _ => None,
+        };
+
+        self.layer = Some(layer);
+        self.applied_output = name.map(str::to_string);
+        self.needs_redraw = true;
+        self.update_available_monitors();
+
+        // A new surface accepts input by default, and the overlay starts hidden. Go
+        // click-through immediately and let the next frame re-apply what the UI needs,
+        // so an invisible overlay never swallows clicks across the output.
+        self.apply_passthrough(true);
+        self.app.forget_passthrough();
+    }
+
+    fn output_names(&self) -> Vec<String> {
+        self.output_state
+            .outputs()
+            .filter_map(|output| self.output_state.info(&output).and_then(|info| info.name))
+            .collect()
+    }
+
     fn size_px(&self) -> [u32; 2] {
         [
             (self.width as f64 * self.scale).round().max(1.0) as u32,
@@ -240,7 +351,9 @@ impl WaylandApp {
             // logical surface size.
             viewport.set_destination(self.width.max(1), self.height.max(1));
         } else {
-            self.layer.wl_surface().set_buffer_scale(self.scale as i32);
+            self.layer()
+                .wl_surface()
+                .set_buffer_scale(self.scale as i32);
         }
 
         // Already initialized: just resize the EGL window.
@@ -250,7 +363,7 @@ impl WaylandApp {
         }
 
         // First-time setup.
-        let surface = self.layer.wl_surface();
+        let surface = self.layer().wl_surface();
         match EglState::new(conn, surface, w as i32, h as i32) {
             Ok(egl) => {
                 let gl = egl.gl.clone();
@@ -273,6 +386,19 @@ impl WaylandApp {
             return;
         };
         if egl.make_current().is_err() {
+            return;
+        }
+
+        // Commit one empty frame first: the compositor only sends preferred scale
+        // and a configure for the surface once it has a buffer to map.
+        if !self.primed {
+            self.primed = true;
+            let size_px = self.size_px();
+            if let Some(gl) = self.gl.as_ref() {
+                egui_glow::painter::clear(gl, size_px, [0.0, 0.0, 0.0, 0.0]);
+            }
+            let _ = egl.swap_buffers();
+            self.needs_redraw = true;
             return;
         }
 
@@ -324,18 +450,18 @@ impl WaylandApp {
 
     /// Toggle click-through + focus to match the eframe `MousePassthrough` behavior.
     fn apply_passthrough(&mut self, passthrough: bool) {
-        let surface = self.layer.wl_surface();
+        let surface = self.layer().wl_surface();
         if passthrough {
             // An empty input region makes every pointer/touch event fall through.
             if let Ok(region) = Region::new(&self.compositor_state) {
                 surface.set_input_region(Some(region.wl_region()));
             }
-            self.layer
+            self.layer()
                 .set_keyboard_interactivity(KeyboardInteractivity::None);
         } else {
             // `None` input region = the whole surface receives input again.
             surface.set_input_region(None);
-            self.layer
+            self.layer()
                 .set_keyboard_interactivity(KeyboardInteractivity::OnDemand);
         }
         surface.commit();
@@ -608,9 +734,17 @@ impl OutputHandler for WaylandApp {
         &mut self.output_state
     }
 
-    fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: WlOutput) {}
-    fn update_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: WlOutput) {}
-    fn output_destroyed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: WlOutput) {}
+    fn new_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: WlOutput) {
+        self.update_available_monitors();
+    }
+
+    fn update_output(&mut self, _: &Connection, _: &QueueHandle<Self>, _: WlOutput) {
+        self.update_available_monitors();
+    }
+
+    fn output_destroyed(&mut self, _: &Connection, _: &QueueHandle<Self>, _: WlOutput) {
+        self.update_available_monitors();
+    }
 }
 
 impl Dispatch<WpFractionalScaleV1, ()> for WaylandApp {

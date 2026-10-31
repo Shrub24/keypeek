@@ -43,5 +43,5 @@ A layer surface gets its `configure` and `preferred_scale` only after a buffer h
 ## Risks
 
 - **Surface replacement churn.** Each retarget destroys and recreates the surface, so a rapid string of changes causes flicker. The setting only changes when the settings window commits, so this is bounded in practice.
-- **Lost inputs.** The keyboard and pointer objects belong to the seat, not the surface, so a retarget does not re-pair inputs; the input region is re-applied on the next passthrough sync.
+- **Lost inputs.** The keyboard and pointer objects belong to the seat, not the surface, so a retarget does not re-pair inputs. A new surface would accept input by default, so `bind_overlay` makes it click-through right away and invalidates the app's passthrough cache, letting the next frame re-apply what the UI actually needs.
 - **Untested platform paths.** The X11/Windows/macOS behaviour is deliberately untouched; those hosts report no outputs, and the settings window says "This display server does not report output names."
