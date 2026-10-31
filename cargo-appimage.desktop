@@ -2,7 +2,7 @@
 Type=Application
 Name=KeyPeek
 Comment=Live keyboard layer overlay for QMK, Vial, and ZMK keyboards
-Exec=keypeek --settings
+Exec=keypeek
 Icon=keypeek
 Terminal=false
 Categories=Utility;

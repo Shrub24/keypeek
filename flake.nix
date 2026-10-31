@@ -124,7 +124,7 @@
               install -Dm644 ${./cargo-appimage.desktop} \
                 $out/share/applications/keypeek.desktop
               substituteInPlace $out/share/applications/keypeek.desktop \
-                --replace-fail "Exec=keypeek" "Exec=$out/bin/keypeek"
+                --replace-fail "Exec=keypeek" "Exec=$out/bin/keypeek --settings"
               install -Dm644 ${./resources/icon.svg} \
                 $out/share/icons/hicolor/scalable/apps/keypeek.svg
               install -Dm644 ${./resources/udev/60-keypeek.rules} \
