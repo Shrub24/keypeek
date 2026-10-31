@@ -85,4 +85,13 @@ package.json
 ## Rustdoc GUI tests
 tests/rustdoc-gui/src/**.lock
 
+## Local tooling artifacts
+.brv/
+.pi/hindsight/
+.opencode/
+prompt.txt
+
 # Before adding new lines, see the comment at the top.
+
+## Session harness
+.cortexkit/

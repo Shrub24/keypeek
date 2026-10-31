@@ -125,6 +125,13 @@ KeyPeek will read layout and keymap directly from the device for ZMK without req
 
 While the settings window is open, clicking any key on the overlay opens the key editor. From there keycodes and behaviors can be selected from categorized lists or found using the search bar. You can switch between layers using the buttons at the top of the editor or click another key on the overlay to change the selection. Key changes are sent directly to the keyboard over the connection.
 
+## Project documentation
+
+- [Architecture](docs/architecture.md)
+- [Technology stack](docs/technology-stack.md)
+- [Development standards](docs/development.md)
+- [Roadmap and external-change policy](docs/roadmap.md)
+
 # Support
 
 If you're enjoying KeyPeek, I'd be truly grateful for your support!
