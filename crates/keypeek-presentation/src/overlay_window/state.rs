@@ -1,3 +1,4 @@
+use super::commands::OverlayOverride;
 use crate::key_paint::KeyPaintStyle;
 use crate::settings::Settings;
 
@@ -5,6 +6,7 @@ pub struct UiState {
     pub settings_visible: bool,
     pub settings_error: Option<String>,
     pub settings_warning: Option<String>,
+    pub overlay_override: OverlayOverride,
 }
 
 impl UiState {

@@ -3,6 +3,7 @@
 use std::sync::Arc;
 use web_time::Instant;
 
+use super::commands::{OverlayCommand, OverlayOverride};
 use super::state::{SettingsState, UiState};
 use super::ui_overlay::OverlayView;
 use crate::key_paint::KeyPaintStyle;
@@ -43,6 +44,7 @@ impl KeyPeekAppCore {
                 settings_visible,
                 settings_error: None,
                 settings_warning: None,
+                overlay_override: OverlayOverride::default(),
             },
             settings: SettingsState::new(base_settings),
             settings_store,
@@ -129,14 +131,34 @@ impl KeyPeekAppCore {
         outcome
     }
 
-    /// Checks if the keyboard overlay should be visible according to open windows
-    /// or active layer hold timeouts.
+    /// Checks if the keyboard overlay should be visible according to the manual
+    /// override, open windows, or active layer hold timeouts.
     pub fn is_overlay_visible(&self) -> bool {
-        if let Some(keyboard) = self.connection_mgr.connected_keyboard() {
-            self.is_any_window_open() || keyboard.overlay_is_visible(Instant::now())
-        } else {
-            false
+        let Some(keyboard) = self.connection_mgr.connected_keyboard() else {
+            // Nothing to draw without a connected keyboard.
+            return false;
+        };
+        if self.is_any_window_open() {
+            // Windows need the overlay: the key editor selects keys by clicking them.
+            return true;
         }
+        match self.ui.overlay_override {
+            OverlayOverride::Auto => keyboard.overlay_is_visible(Instant::now()),
+            OverlayOverride::Shown => true,
+            OverlayOverride::Hidden => false,
+        }
+    }
+
+    /// Applies a control request from the tray, the command line, or the control socket.
+    pub fn apply_overlay_command(&mut self, command: OverlayCommand) {
+        if command == OverlayCommand::Settings {
+            self.ui.settings_visible = true;
+            return;
+        }
+        self.ui.overlay_override = self
+            .ui
+            .overlay_override
+            .apply(command, self.is_overlay_visible());
     }
 
     /// Schedules a repaint when the overlay visibility timer expires.

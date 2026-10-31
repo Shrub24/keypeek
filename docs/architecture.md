@@ -47,7 +47,11 @@ At the 0.11.0 base a claimed identity also suppresses its Vial entry, and a plai
 
 ## Overlay visibility
 
-`KeyboardDomain` owns a `VisibilityStateMachine`. On every layer-state update it classifies the state as `Selected`, `Excluded` or `Base` from the visible-layer mask, and produces a `VisibilityWindow` (`from`, optional `until`): a held visible layer shows the overlay immediately after the activation delay, a released one keeps it for the configured timeout, and a negative timeout keeps it visible until the layer state changes. Hosts ask the window whether it is visible at a given instant and sleep until `changes_in`. Visibility is therefore driven entirely by the keyboard; there is no manual show/hide control.
+`KeyboardDomain` owns a `VisibilityStateMachine`. On every layer-state update it classifies the state as `Selected`, `Excluded` or `Base` from the visible-layer mask, and produces a `VisibilityWindow` (`from`, optional `until`): a held visible layer shows the overlay immediately after the activation delay, a released one keeps it for the configured timeout, and a negative timeout keeps it visible until the layer state changes. Hosts ask the window whether it is visible at a given instant and sleep until `changes_in`.
+
+That layer-driven answer is the `Auto` state of a manual override (`OverlayOverride` in `UiState`). `Shown` keeps the overlay visible while a keyboard is connected regardless of layers and timeouts; `Hidden` suppresses it. Both are resolved inside `KeyPeekAppCore::is_overlay_visible`, the single decision point both hosts and the drawing path consult, and both give way while a settings or key editor window is open, since the editor selects keys by clicking them. The override is never persisted, so a declarative configuration stays authoritative and a restart returns to `Auto`.
+
+Requests arrive as `OverlayCommand` values on a shared queue that the desktop app drains once per frame. The tray menu pushes the same commands, so Settings… is no longer a separate flag. The native runner also serves a Unix socket at `$XDG_RUNTIME_DIR/keypeek.sock` (mode `0600`, one command per connection) and exposes `--toggle`, `--show`, `--hide`, `--auto`, and `--settings` on the binary; those invocations send one line and exit without starting the application. `--toggle` is resolved against the effective visibility at drain time, so it needs no state on the client side.
 
 ## Keymap editor
 
@@ -65,8 +69,9 @@ Platform differences are confined to narrow ports:
 - **`RawHidTransport` and `Reopener`.** The device I/O seam, implemented by `hidapi` natively and by WebHID in the browser.
 - **`OverlayHost`.** Requests of the window host: mouse passthrough and close.
 - **`UiWake`.** The single wake-up channel from background sessions to the UI thread.
+- **Control socket.** A Unix socket in the runtime directory, owned by `keypeek-desktop`, feeding the same command queue as the tray.
 
-Native specifics: the Wayland host builds a wlr-layer-shell surface anchored to all edges and sized by the compositor, falling back to eframe on XWayland when layer shell is unavailable (for example on GNOME/Mutter); the tray runs on a dedicated GTK thread on Linux because libappindicator registers its StatusNotifierItem over DBus through the glib main loop, and offers Settings… and Quit.
+Native specifics: the Wayland host builds a wlr-layer-shell surface anchored to all edges and sized by the compositor, falling back to eframe on XWayland when layer shell is unavailable (for example on GNOME/Mutter); the tray runs on a dedicated GTK thread on Linux because libappindicator registers its StatusNotifierItem over DBus through the glib main loop, and offers Settings…, Show Overlay, Hide Overlay, Follow Layers, and Quit.
 
 ## Settings
 

@@ -133,6 +133,26 @@ On NixOS, add the package to `services.udev.packages`. On other distributions wi
 - **Desktop:** Devices are scanned when the app starts. For QMK you will be prompted to select the `keyboard_info.json` generated from your keymap when you connect. For Vial and ZMK, just select the connected device from the dropdown, since they provide layout information directly.
 - **Web:** In a browser supporting WebHID, Web Serial, or Web Bluetooth (such as Chrome or Edge), select your keyboard using the browser pairing dialog.
 
+### Overlay visibility
+
+By default the overlay follows the layers you hold and disappears after the configured timeout. A running instance can also be driven from outside:
+
+```sh
+keypeek --toggle     # hide if visible, show if hidden
+keypeek --show       # pin visible, regardless of layers
+keypeek --hide       # hide until re-enabled
+keypeek --auto       # back to layer-driven visibility
+keypeek --settings   # open the settings window
+```
+
+These reach the running instance over `$XDG_RUNTIME_DIR/keypeek.sock`, so they do nothing when KeyPeek is not running. Bind them like any other command, for example in Hyprland:
+
+```
+bind = SUPER, K, exec, keypeek --toggle
+```
+
+The override lasts until it is changed again and is not written to `settings.ini`, so a declarative configuration stays authoritative. A settings or key editor window always keeps the overlay visible, because the editor selects keys by clicking them.
+
 ### Keymap Editor
 
 While the settings window is open, clicking any key on the overlay opens the key editor. From there keycodes and behaviors can be selected from categorized lists or found using the search bar. You can switch between layers using the buttons at the top of the editor or click another key on the overlay to change the selection. Key changes are sent directly to the keyboard over the connection.

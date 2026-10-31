@@ -1,6 +1,7 @@
-use keypeek_presentation::{add_phosphor_to_fonts, DesktopOverlayApp, OverlayHost, SettingsStore};
+use keypeek_presentation::{
+    add_phosphor_to_fonts, CommandQueue, DesktopOverlayApp, OverlayHost, SettingsStore,
+};
 use keypeek_protocol::{DiscoveredDevice, UiWake};
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 struct EframeHost<'a> {
@@ -196,21 +197,17 @@ fn run_inner(
 
             let ctx = cc.egui_ctx.clone();
             let ui_wake = UiWake::new(Arc::new(move || ctx.request_repaint()));
-            let settings_requested = Arc::new(AtomicBool::new(false));
-            let tray_icon = super::tray::create_tray_icon({
-                let settings_requested = settings_requested.clone();
-                let ui_wake = ui_wake.clone();
-                Arc::new(move || {
-                    settings_requested.store(true, Ordering::Relaxed);
-                    ui_wake.request_repaint();
-                })
-            });
-
+            let commands = Arc::new(CommandQueue::default());
+            #[cfg(unix)]
+            if let Err(e) = super::ipc::spawn(commands.clone(), ui_wake.clone()) {
+                eprintln!("KeyPeek: overlay control unavailable: {e}");
+            }
+            let tray_icon = super::tray::create_tray_icon(commands.clone(), ui_wake.clone());
             let mut fonts = egui::FontDefinitions::default();
             add_phosphor_to_fonts(&mut fonts);
             cc.egui_ctx.set_fonts(fonts);
 
-            let app = DesktopOverlayApp::new(settings_requested, ui_wake, settings_store, devices);
+            let app = DesktopOverlayApp::new(commands, ui_wake, settings_store, devices);
             Ok(Box::new(EframeApp {
                 app,
                 _tray: tray_icon,

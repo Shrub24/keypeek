@@ -1,4 +1,6 @@
 use image::load_from_memory;
+use keypeek_presentation::{CommandQueue, OverlayCommand};
+use keypeek_protocol::UiWake;
 use std::process;
 use std::sync::Arc;
 use std::thread;
@@ -57,6 +59,10 @@ fn build_tray_icon() -> TrayIcon {
     menu.append_items(&[
         &MenuItem::with_id("settings", "Settings…", true, None),
         &PredefinedMenuItem::separator(),
+        &MenuItem::with_id("show", "Show Overlay", true, None),
+        &MenuItem::with_id("hide", "Hide Overlay", true, None),
+        &MenuItem::with_id("auto", "Follow Layers", true, None),
+        &PredefinedMenuItem::separator(),
         &MenuItem::with_id("quit", "Quit", true, None),
     ])
     .expect("Failed to append menu items.");
@@ -76,13 +82,21 @@ fn build_tray_icon() -> TrayIcon {
     builder.build().unwrap()
 }
 
-pub fn create_tray_icon(on_settings: Arc<dyn Fn() + Send + Sync>) -> Tray {
+pub fn create_tray_icon(commands: Arc<CommandQueue>, ui_wake: UiWake) -> Tray {
+    let request: Arc<dyn Fn(OverlayCommand) + Send + Sync> = Arc::new(move |command| {
+        commands.push(command);
+        ui_wake.request_repaint();
+    });
+
     thread::spawn({
-        let on_settings = on_settings.clone();
+        let request = request.clone();
         move || {
             while let Ok(event) = MenuEvent::receiver().recv() {
                 match event.id.0.as_str() {
-                    "settings" => on_settings(),
+                    "settings" => request(OverlayCommand::Settings),
+                    "show" => request(OverlayCommand::Show),
+                    "hide" => request(OverlayCommand::Hide),
+                    "auto" => request(OverlayCommand::Auto),
                     "quit" => process::exit(0),
                     _ => {}
                 }
@@ -101,7 +115,7 @@ pub fn create_tray_icon(on_settings: Arc<dyn Fn() + Send + Sync>) -> Tray {
                 ..
             } = event
             {
-                on_settings();
+                request(OverlayCommand::Settings);
             }
         }
     });

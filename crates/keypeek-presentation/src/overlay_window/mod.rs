@@ -1,12 +1,14 @@
 //! Application window coordinators and presentation views.
 
 mod app_core;
+mod commands;
 mod desktop;
 mod state;
 mod ui_overlay;
 mod ui_settings;
 
 pub use app_core::KeyPeekAppCore;
+pub use commands::{CommandQueue, OverlayCommand, OverlayOverride};
 pub use desktop::{DesktopApp, DesktopOverlayApp, OverlayApp};
 pub use state::{SettingsState, UiState};
 pub use ui_overlay::{draw_overlay_keys, draw_overlay_keys_with_pinned, OverlayView};

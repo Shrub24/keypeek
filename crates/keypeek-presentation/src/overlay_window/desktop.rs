@@ -1,7 +1,7 @@
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 
 use super::app_core::KeyPeekAppCore;
+use super::commands::CommandQueue;
 use crate::overlay_host::OverlayHost;
 use crate::settings::SettingsStore;
 use keypeek_protocol::connection_manager::{ConnectOutcome, ConnectionEvent};
@@ -19,7 +19,7 @@ pub fn clear_color(is_any_window_open: bool) -> egui::Rgba {
 /// Top-level coordinator for desktop execution: multi-windowing, system tray,
 /// mouse passthrough, and native file dialogs.
 pub struct DesktopOverlayApp {
-    pub(super) settings_requested: Arc<AtomicBool>,
+    pub(super) commands: Arc<CommandQueue>,
     pub core: KeyPeekAppCore,
     pub(super) file_dialog: egui_file_dialog::FileDialog,
     pub(super) mouse_passthrough: Option<bool>,
@@ -44,13 +44,13 @@ impl std::ops::DerefMut for DesktopOverlayApp {
 
 impl DesktopOverlayApp {
     pub fn new(
-        settings_requested: Arc<AtomicBool>,
+        commands: Arc<CommandQueue>,
         ui_wake: UiWake,
         settings_store: Arc<dyn SettingsStore>,
         available_devices: Vec<DiscoveredDevice>,
     ) -> Self {
         Self {
-            settings_requested,
+            commands,
             core: KeyPeekAppCore::new(ui_wake, settings_store, available_devices, true),
             file_dialog: egui_file_dialog::FileDialog::new(),
             mouse_passthrough: None,
@@ -104,8 +104,8 @@ impl DesktopOverlayApp {
 
     /// Updates state, handles background tasks, and processes input before drawing.
     pub fn update(&mut self, ctx: &egui::Context, host: &mut dyn OverlayHost) {
-        if self.settings_requested.swap(false, Ordering::Relaxed) {
-            self.core.ui.settings_visible = true;
+        for command in self.commands.drain() {
+            self.core.apply_overlay_command(command);
         }
 
         if let Some(ConnectionEvent::RequiresLayoutFile(_)) = self.core.update_connection(ctx) {

@@ -5,7 +5,6 @@
 mod egl;
 mod input;
 
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use web_time::Instant;
@@ -50,7 +49,9 @@ use wayland_client::{
 
 use egui_glow::glow;
 
-use keypeek_presentation::{add_phosphor_to_fonts, DesktopOverlayApp, OverlayHost, SettingsStore};
+use keypeek_presentation::{
+    add_phosphor_to_fonts, CommandQueue, DesktopOverlayApp, OverlayHost, SettingsStore,
+};
 use keypeek_protocol::{DiscoveredDevice, UiWake};
 
 use egl::EglState;
@@ -165,16 +166,12 @@ pub fn run(
     egui_ctx.set_fonts(fonts);
 
     let ui_wake = UiWake::new(Arc::new(move || ping.ping()));
-    let settings_requested = Arc::new(AtomicBool::new(false));
-    let tray_icon = super::tray::create_tray_icon({
-        let settings_requested = settings_requested.clone();
-        let ui_wake = ui_wake.clone();
-        Arc::new(move || {
-            settings_requested.store(true, Ordering::Relaxed);
-            ui_wake.request_repaint();
-        })
-    });
-    let app = DesktopOverlayApp::new(settings_requested, ui_wake, settings_store, devices);
+    let commands = Arc::new(CommandQueue::default());
+    if let Err(e) = super::ipc::spawn(commands.clone(), ui_wake.clone()) {
+        eprintln!("KeyPeek: overlay control unavailable: {e}");
+    }
+    let tray_icon = super::tray::create_tray_icon(commands.clone(), ui_wake.clone());
+    let app = DesktopOverlayApp::new(commands, ui_wake, settings_store, devices);
 
     let mut state = WaylandApp {
         registry_state: RegistryState::new(&globals),
