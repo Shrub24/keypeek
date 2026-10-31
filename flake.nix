@@ -111,12 +111,28 @@
         // {
           inherit cargoArtifacts;
           doCheck = false;
+          meta.mainProgram = "keypeek";
         }
         // {
           nativeBuildInputs = [pkgs.makeWrapper];
-          postInstall = ''
-            wrapProgram "$out/bin/keypeek" --prefix LD_LIBRARY_PATH : "${libPath}"
-          '';
+          postInstall =
+            if pkgs.stdenv.isLinux
+            then ''
+              wrapProgram "$out/bin/keypeek" --prefix LD_LIBRARY_PATH : "${libPath}"
+
+              # Desktop and BLE integration assets; see README (Linux permissions).
+              install -Dm644 ${./cargo-appimage.desktop} \
+                $out/share/applications/keypeek.desktop
+              substituteInPlace $out/share/applications/keypeek.desktop \
+                --replace-fail "Exec=keypeek" "Exec=$out/bin/keypeek"
+              install -Dm644 ${./resources/icon.svg} \
+                $out/share/icons/hicolor/scalable/apps/keypeek.svg
+              install -Dm644 ${./resources/udev/60-keypeek.rules} \
+                $out/lib/udev/rules.d/60-keypeek.rules
+            ''
+            else ''
+              wrapProgram "$out/bin/keypeek" --prefix LD_LIBRARY_PATH : "${libPath}"
+            '';
         });
     in {
       checks = {

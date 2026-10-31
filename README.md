@@ -112,6 +112,18 @@ KeyPeek will read layout and keymap directly from the device for ZMK without req
 > [!NOTE]
 > If the keyboard has been paired via Bluetooth before enabling raw HID support, re-pairing may be necessary to allow the new communication channel.
 
+### Linux permissions
+
+USB access is covered by the ZMK udev rules that ship with most distributions: devices with USB ID `1d50:615e` (the default ZMK identity, used by boards such as the nice!nano) need write access to their serial port and HID interfaces, which those rules grant.
+
+BLE keyboards have no USB identity at all, so those rules cannot match them. For BLE HID devices, access is granted by modalias instead. The Nix package includes a rule for ZMK's default identity at `lib/udev/rules.d/60-keypeek.rules`:
+
+```
+KERNEL=="hidraw*", ATTRS{modalias}=="hid:b0005g0001v00001D50p0000615E", TAG+="uaccess"
+```
+
+On NixOS, add the package to `services.udev.packages`. On other distributions with system-manager, the `systemManagerModules.default` flake output links the packaged rule into `/etc/udev/rules.d`; on any other system, copy the rule from the package into `/etc/udev/rules.d/` manually. Rules are only evaluated when a device appears, so unplug and replug the keyboard (or run `udevadm control --reload && udevadm trigger`) after installing or changing a rule.
+
 ## Usage
 
 <img src=".github/assets/edit_key_window.png" alt="Key editor screenshot" width="100%">

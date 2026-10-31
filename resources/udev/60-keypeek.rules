@@ -1,0 +1,6 @@
+# KeyPeek: allow the active local user to open ZMK BLE HID devices.
+# BLE HID devices have no USB identity, so they are matched by modalias:
+# HID over Bluetooth LE (b0005), keyboard (g0001), ZMK's default USB
+# vendor/product ID (v00001D50p0000615E). USB access for the same ID is
+# handled by your distribution's ZMK udev rules; see the README.
+KERNEL=="hidraw*", ATTRS{modalias}=="hid:b0005g0001v00001D50p0000615E", TAG+="uaccess"
