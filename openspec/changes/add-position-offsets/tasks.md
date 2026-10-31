@@ -29,7 +29,7 @@
 
 ## 4. Validation
 
-- [ ] 4.1 Run scoped Rust and Nix validation.
+- [x] 4.1 Run scoped Rust and Nix validation.
   - delegate: BuildAgent
   - verify: Run `cargo fmt --check`, the affected Rust tests, and `nix flake check`.
 - [ ] 4.2 Review the change against the specification and validate OpenSpec.

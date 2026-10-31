@@ -151,11 +151,7 @@ keypeek --auto       # back to layer-driven visibility
 keypeek --settings   # open the settings window
 ```
 
-Bind them like any other command, for example in Hyprland:
-
-```
-bind = SUPER, K, exec, keypeek --toggle
-```
+Bind them like any other command in your compositor's configuration, for example `bind = SUPER, K, exec, keypeek --toggle` in a wlroots-style compositor.
 
 These reach the running instance over `$XDG_RUNTIME_DIR/keypeek.sock`. The hotkey commands do nothing when KeyPeek is not running; `--settings` is the exception — it starts an instance with the settings window open when none is listening, which is why the desktop entry uses it. Launching KeyPeek from your application menu therefore configures the running instance instead of starting a second overlay.
 
