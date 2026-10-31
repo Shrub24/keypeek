@@ -138,7 +138,6 @@
       checks = {
         # Build the crate as part of `nix flake check` for convenience
         inherit keypeek;
-
         # Run clippy (and deny all warnings) on the crate source,
         # again, reusing the dependency artifacts from above.
         #
@@ -190,6 +189,64 @@
             statix.enable = true;
           };
         };
+
+        # Minimal test configurations that keep the modules evaluating.
+        # The HM/system-manager option sets are stubbed with the subset the
+        # modules touch, so the flake stays free of those inputs.
+        keypeek-hm-module = let
+          evaled = lib.evalModules {
+            specialArgs = {inherit pkgs;};
+            modules = [
+              self.homeManagerModules.default
+              {
+                options.home.packages = lib.mkOption {
+                  type = lib.types.listOf lib.types.package;
+                  default = [];
+                };
+                options.systemd.user.services = lib.mkOption {
+                  type = lib.types.attrsOf lib.types.anything;
+                  default = {};
+                };
+              }
+              {
+                programs.keypeek = {
+                  enable = true;
+                  settings.size = 80;
+                  service.enable = true;
+                };
+              }
+            ];
+          };
+        in
+          pkgs.runCommand "keypeek-hm-module" {}
+          ''
+            test -n "${toString (lib.length evaled.config.home.packages)}"
+            test -e "$(echo ${evaled.config.systemd.user.services.keypeek.Service.ExecStart} | cut -d' ' -f1)"
+            touch $out
+          '';
+
+        keypeek-sm-module = let
+          evaled = lib.evalModules {
+            specialArgs = {inherit pkgs;};
+            modules = [
+              self.systemManagerModules.default
+              {
+                options.environment.etc = lib.mkOption {
+                  type = lib.types.attrsOf (lib.types.submodule {
+                    options.source = lib.mkOption {type = lib.types.nullOr lib.types.path;};
+                  });
+                  default = {};
+                };
+              }
+              {programs.keypeek.bleUdev.enable = true;}
+            ];
+          };
+        in
+          pkgs.runCommand "keypeek-sm-module" {}
+          ''
+            test -e "${evaled.config.environment.etc."udev/rules.d/60-keypeek.rules".source}"
+            touch $out
+          '';
       };
 
       packages =
@@ -218,5 +275,117 @@
         # Extra inputs can be added here; cargo and rustc are provided by default.
         packages = [];
       };
-    });
+    })
+    // {
+      homeManagerModules.default = {
+        config,
+        lib,
+        pkgs,
+        ...
+      }: let
+        cfg = config.programs.keypeek;
+        settingsFormat = pkgs.formats.ini {};
+        configFile = settingsFormat.generate "keypeek-settings.ini" {
+          settings = builtins.mapAttrs (_: v:
+            if v == true
+            then "true"
+            else if v == false
+            then "false"
+            else toString v)
+          cfg.settings;
+        };
+      in {
+        options.programs.keypeek = {
+          enable = lib.mkEnableOption "KeyPeek, the keyboard layer overlay";
+
+          package = lib.mkOption {
+            type = lib.types.package;
+            default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+            defaultText = lib.literalExpression ''
+              keypeek.packages.''${system}.default
+            '';
+            description = "The KeyPeek package to use.";
+          };
+
+          settings = lib.mkOption {
+            type = lib.types.attrsOf (lib.types.oneOf [
+              lib.types.bool
+              lib.types.int
+              lib.types.float
+              lib.types.str
+            ]);
+            default = {};
+            example = lib.literalExpression ''
+              {
+                size = 80;
+                position = "Bottom Right";
+                timeout = 4000;
+                legend_mode = "Single";
+              }
+            '';
+            description = ''
+              Key-value pairs written to the `[settings]` section of a
+              generated read-only INI file. KeyPeek only reads this file
+              when launched with `--config`; the bundled service does so
+              automatically, so these settings take effect through it.
+            '';
+          };
+
+          service.enable = lib.mkEnableOption "the KeyPeek systemd user service";
+        };
+
+        config = lib.mkIf cfg.enable {
+          home.packages = [cfg.package];
+
+          systemd.user.services.keypeek = lib.mkIf cfg.service.enable {
+            Unit = {
+              Description = "KeyPeek keyboard layer overlay";
+              PartOf = ["graphical-session.target"];
+              After = ["graphical-session.target"];
+            };
+            Service = {
+              ExecStart =
+                if cfg.settings != {}
+                then "${lib.getExe cfg.package} --config ${configFile}"
+                else "${lib.getExe cfg.package}";
+              Restart = "on-failure";
+              RestartSec = 2;
+            };
+            Install = {WantedBy = ["graphical-session.target"];};
+          };
+        };
+      };
+
+      systemManagerModules.default = {
+        config,
+        lib,
+        pkgs,
+        ...
+      }: let
+        cfg = config.programs.keypeek.bleUdev;
+      in {
+        options.programs.keypeek.bleUdev = {
+          enable = lib.mkEnableOption ''
+            the packaged KeyPeek BLE udev rule, granting the active local
+            user access to ZMK BLE HID devices
+          '';
+
+          package = lib.mkOption {
+            type = lib.types.package;
+            default = self.packages.${pkgs.stdenv.hostPlatform.system}.default;
+            defaultText = lib.literalExpression ''
+              keypeek.packages.''${system}.default
+            '';
+            description = ''
+              The package whose BLE udev rule is linked into
+              `/etc/udev/rules.d`.
+            '';
+          };
+        };
+
+        config = lib.mkIf cfg.enable {
+          environment.etc."udev/rules.d/60-keypeek.rules".source = "${cfg.package}/lib/udev/rules.d/60-keypeek.rules";
+        };
+      };
+    };
 }
