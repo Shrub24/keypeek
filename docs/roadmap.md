@@ -9,7 +9,7 @@ The downstream currently tracks upstream 0.11.0 (`78a2274`), which restructured 
 Features land as one atomic change per concern, in the approved sequence below. The sequence is ordered but not scheduled: each change starts only when the work it depends on is complete. Later changes are specified by their own OpenSpec proposal when they start.
 
 - **Foundation — `establish-downstream-foundation`.** Record the architecture, engineering posture, workflow, and roadmap before independent feature work begins.
-- **First feature change — `integrate-native-nix-support`.** Complete desktop and BLE permission packaging, then export Home Manager and system-manager modules.
+- **First feature change — `integrate-native-nix-support`.** Complete desktop and BLE permission packaging, then export Home Manager and NixOS modules.
 - **Subsequent changes, in order:**
   - `add-declarative-overlay-service` — landed: local show/hide control over a command socket, plus tray entries and the `--toggle` family.
   - `add-output-selection` — landed: the overlay is bound to a chosen output and retargets live.

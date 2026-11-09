@@ -122,7 +122,7 @@ BLE keyboards have no USB identity at all, so those rules cannot match them. For
 KERNEL=="hidraw*", ATTRS{modalias}=="hid:b0005g0001v00001D50p0000615E", TAG+="uaccess"
 ```
 
-On NixOS, add the package to `services.udev.packages`. On other distributions with system-manager, the `systemManagerModules.default` flake output links the packaged rule into `/etc/udev/rules.d`; on any other system, copy the rule from the package into `/etc/udev/rules.d/` manually. Rules are only evaluated when a device appears, so unplug and replug the keyboard (or run `udevadm control --reload && udevadm trigger`) after installing or changing a rule.
+On NixOS, import the `nixosModules.default` flake output and set `programs.keypeek.bleUdev.enable = true` (or add the package to `services.udev.packages` yourself); on any other system, copy the rule from the package's `lib/udev/rules.d` into `/etc/udev/rules.d/` manually. Rules are only evaluated when a device appears, so unplug and replug the keyboard (or run `udevadm control --reload && udevadm trigger`) after installing or changing a rule.
 
 ### Declarative setup (Nix)
 

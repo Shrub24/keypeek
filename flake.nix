@@ -197,7 +197,7 @@
         };
 
         # Minimal test configurations that keep the modules evaluating.
-        # The HM/system-manager option sets are stubbed with the subset the
+        # The HM/NixOS option sets are stubbed with the subset the
         # modules touch, so the flake stays free of those inputs.
         keypeek-hm-module = let
           evaled = lib.evalModules {
@@ -241,26 +241,24 @@
             touch $out
           '';
 
-        keypeek-sm-module = let
+        keypeek-nixos-module = let
           evaled = lib.evalModules {
             specialArgs = {inherit pkgs;};
             modules = [
-              self.systemManagerModules.default
+              self.nixosModules.default
               {
-                options.environment.etc = lib.mkOption {
-                  type = lib.types.attrsOf (lib.types.submodule {
-                    options.source = lib.mkOption {type = lib.types.nullOr lib.types.path;};
-                  });
-                  default = {};
+                options.services.udev.packages = lib.mkOption {
+                  type = lib.types.listOf lib.types.package;
+                  default = [];
                 };
               }
               {programs.keypeek.bleUdev.enable = true;}
             ];
           };
         in
-          pkgs.runCommand "keypeek-sm-module" {}
+          pkgs.runCommand "keypeek-nixos-module" {}
           ''
-            test -e "${evaled.config.environment.etc."udev/rules.d/60-keypeek.rules".source}"
+            test -e "${builtins.head evaled.config.services.udev.packages}/lib/udev/rules.d/60-keypeek.rules"
             touch $out
           '';
       };
@@ -393,7 +391,7 @@
         };
       };
 
-      systemManagerModules.default = {
+      nixosModules.default = {
         config,
         lib,
         pkgs,
@@ -414,14 +412,18 @@
               keypeek.packages.''${system}.default
             '';
             description = ''
-              The package whose BLE udev rule is linked into
-              `/etc/udev/rules.d`.
+              The package whose BLE udev rule is installed. The rule lives in
+              the package's `lib/udev/rules.d`, which `services.udev.packages`
+              collects, so nothing is linked into `/etc` by hand.
             '';
           };
         };
 
+        # NixOS already walks `lib/udev/rules.d` of every package listed here, and
+        # `/etc/udev/rules.d` is the udev module's own to manage: a hand-written
+        # entry inside it fails the `etc` derivation.
         config = lib.mkIf cfg.enable {
-          environment.etc."udev/rules.d/60-keypeek.rules".source = "${cfg.package}/lib/udev/rules.d/60-keypeek.rules";
+          services.udev.packages = [cfg.package];
         };
       };
     };
