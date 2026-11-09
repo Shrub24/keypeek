@@ -66,9 +66,15 @@
         name = "source";
       };
 
+      # The workspace root is a virtual manifest, so crane cannot read a name or
+      # version from it; both are stated here instead.
+      cargoToml = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+
       # Common arguments can be set here to avoid repeating them later
       commonArgs = {
         inherit src;
+        pname = "keypeek";
+        inherit (cargoToml.workspace.package) version;
         strictDeps = false; # else openssl-sys fails
 
         buildInputs = with pkgs; [
