@@ -288,7 +288,12 @@ impl WaylandApp {
             viewport.destroy();
         }
         if let Some(layer) = self.layer.take() {
-            layer.wl_surface().destroy();
+            // The layer-shell role must be destroyed before its surface; the
+            // reverse order is a protocol error the compositor answers by
+            // dropping the whole connection.
+            let surface = layer.wl_surface().clone();
+            drop(layer);
+            surface.destroy();
         }
 
         let output = name.and_then(|name| self.output_for_name(name));
