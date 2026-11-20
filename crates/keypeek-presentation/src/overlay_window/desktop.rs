@@ -8,15 +8,6 @@ use crate::settings::SettingsStore;
 use keypeek_protocol::connection_manager::{ConnectOutcome, ConnectionEvent};
 use keypeek_protocol::{DiscoveredDevice, Keyboard, UiWake};
 
-/// Background clear color for desktop: transparent overlay or dimmed backdrop.
-pub fn clear_color(is_any_window_open: bool) -> egui::Rgba {
-    if is_any_window_open {
-        egui::Rgba::from_black_alpha(0.65)
-    } else {
-        egui::Rgba::TRANSPARENT
-    }
-}
-
 /// Top-level coordinator for desktop execution: multi-windowing, system tray,
 /// mouse passthrough, and native file dialogs.
 pub struct DesktopOverlayApp {
@@ -64,11 +55,6 @@ impl DesktopOverlayApp {
             file_dialog: egui_file_dialog::FileDialog::new(),
             mouse_passthrough: None,
         }
-    }
-
-    /// Background color before egui paints.
-    pub fn clear_color(&self) -> egui::Rgba {
-        clear_color(self.is_any_window_open())
     }
 
     /// Initiates connection for the currently selected device in connection_mgr.
@@ -146,7 +132,7 @@ impl DesktopOverlayApp {
     }
 
     /// Shows a modal dialog with `message` and an OK button that clears `slot`.
-    fn message_window(ctx: &egui::Context, title: &str, slot: &mut Option<String>) {
+    pub(super) fn message_window(ctx: &egui::Context, title: &str, slot: &mut Option<String>) {
         let Some(message) = slot.clone() else {
             return;
         };
@@ -185,8 +171,9 @@ impl DesktopOverlayApp {
             });
     }
 
-    /// Renders desktop windows: overlay, key editor, settings, and notices.
-    pub fn render(&mut self, ctx: &egui::Context, host: &mut dyn OverlayHost) {
+    /// Renders the overlay and key editor, plus the settings window with its
+    /// notices in a viewport of its own.
+    pub fn render(&mut self, ctx: &egui::Context) {
         let connected = self.core.connection_mgr.connected_pair();
         if let Some((keyboard, profile)) = &connected {
             self.draw_overlay_window(ctx, keyboard, self.overlay_visible());
@@ -195,17 +182,14 @@ impl DesktopOverlayApp {
         }
 
         if self.ui.settings_visible {
-            self.draw_settings_window(ctx, host);
+            self.draw_settings_window(ctx);
         }
-
-        Self::message_window(ctx, "Error", &mut self.core.ui.settings_error);
-        Self::message_window(ctx, "Notice", &mut self.core.ui.settings_warning);
     }
 
     /// Primary entry point called by the desktop platform runner.
     pub fn ui(&mut self, ctx: &egui::Context, host: &mut dyn OverlayHost) {
         self.update(ctx, host);
-        self.render(ctx, host);
+        self.render(ctx);
         self.schedule_overlay_repaint(ctx);
     }
 }

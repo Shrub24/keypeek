@@ -13,10 +13,6 @@ impl OverlayHost for EframeHost<'_> {
         self.ctx
             .send_viewport_cmd(egui::ViewportCommand::MousePassthrough(enabled));
     }
-
-    fn request_close(&mut self) {
-        self.ctx.send_viewport_cmd(egui::ViewportCommand::Close);
-    }
 }
 
 struct EframeApp {
@@ -35,7 +31,7 @@ struct EframeApp {
 
 impl eframe::App for EframeApp {
     fn clear_color(&self, _visuals: &egui::Visuals) -> [f32; 4] {
-        self.app.clear_color().to_array()
+        egui::Rgba::TRANSPARENT.to_array()
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {

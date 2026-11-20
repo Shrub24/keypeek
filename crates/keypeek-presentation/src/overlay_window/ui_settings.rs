@@ -1,10 +1,8 @@
 use super::DesktopOverlayApp;
-use crate::overlay_host::OverlayHost;
 use crate::settings::{
     LayerMask, LegendMode, MonitorSelection, Settings, ThemeColor, ThemeSettings, WindowPosition,
 };
 use crate::ui_widgets::{github_link, titled_group, version_link};
-use egui::Window;
 
 impl DesktopOverlayApp {
     /// The color button that ends every theme row, right-aligned in the row.
@@ -179,230 +177,230 @@ impl DesktopOverlayApp {
         });
     }
 
-    pub(super) fn draw_settings_window(&mut self, ctx: &egui::Context, host: &mut dyn OverlayHost) {
-        let mut open = self.ui.settings_visible;
+    /// Shows the settings window as a viewport of its own, which the host opens as
+    /// a native window, so it is placed like any other application window rather
+    /// than on the overlay's output.
+    pub(super) fn draw_settings_window(&mut self, ctx: &egui::Context) {
+        let builder = egui::ViewportBuilder::default()
+            .with_title("KeyPeek Settings")
+            .with_app_id("keypeek")
+            .with_inner_size([450.0, 700.0])
+            .with_min_inner_size([450.0, 300.0]);
 
-        let settings_window_size = egui::vec2(450.0, 700.0);
-        let settings_window_pos = ctx.viewport_rect().center() - settings_window_size * 0.5;
-
-        Window::new("KeyPeek Settings")
-            .open(&mut open)
-            .default_size(settings_window_size)
-            .default_pos(settings_window_pos)
-            .collapsible(false)
-            .resizable(false)
-            .show(ctx, |ui| {
-                self.draw_connection_settings(ui);
-
-                titled_group(ui, "Overlay Appearance", |ui| {
-                    egui::Grid::new("appearance_grid")
-                        .num_columns(2)
-                        .striped(true)
-                        .spacing([20.0, 10.0])
-                        .show(ui, |ui| {
-                            ui.label("Alignment");
-                            egui::ComboBox::from_id_salt("position_combo")
-                                .width(ui.available_width())
-                                .selected_text(self.settings.draft.position.to_string())
-                                .show_ui(ui, |ui| {
-                                    for pos in WindowPosition::ALL {
-                                        ui.selectable_value(
-                                            &mut self.settings.draft.position,
-                                            pos,
-                                            pos.to_string(),
-                                        );
-                                    }
-                                });
-                            ui.end_row();
-
-                            ui.label("Monitor");
-                            let monitors = self.ui.available_monitors.clone();
-                            egui::ComboBox::from_id_salt("monitor_combo")
-                                .width(ui.available_width())
-                                .selected_text(self.settings.draft.monitor.to_string())
-                                .show_ui(ui, |ui| {
-                                    ui.selectable_value(
-                                        &mut self.settings.draft.monitor,
-                                        MonitorSelection::Primary,
-                                        "Primary",
-                                    );
-                                    for name in monitors {
-                                        let value = MonitorSelection::Named(name.clone());
-                                        ui.selectable_value(
-                                            &mut self.settings.draft.monitor,
-                                            value,
-                                            name,
-                                        );
-                                    }
-                                });
-                            if self.ui.available_monitors.is_empty() {
-                                ui.small("This display server does not report output names.");
-                            }
-                            ui.end_row();
-
-                            ui.label("Display duration");
-                            let mut timeout_ui =
-                                Self::timeout_to_ui_value(self.settings.draft.timeout);
-                            ui.add_sized(
-                                ui.available_size(),
-                                egui::DragValue::new(&mut timeout_ui)
-                                    .speed(50)
-                                    .range(0..=15_000)
-                                    .custom_formatter(|value, _range| {
-                                        if value >= 15_000.0 {
-                                            "∞".to_string()
-                                        } else {
-                                            format!("{} ms", value as i64)
-                                        }
-                                    }),
-                            );
-                            self.settings.draft.timeout = Self::ui_value_to_timeout(timeout_ui);
-                            ui.end_row();
-
-                            ui.label("Activation delay");
-                            ui.add_sized(
-                                ui.available_size(),
-                                egui::DragValue::new(&mut self.settings.draft.activation_delay)
-                                    .speed(10)
-                                    .range(0..=Settings::MAX_ACTIVATION_DELAY_MS)
-                                    .suffix(" ms"),
-                            )
-                            .on_hover_text(
-                                "How long a layer has to be held before the overlay appears",
-                            );
-                            ui.end_row();
-
-                            ui.label("Horizontal offset");
-                            ui.add_sized(
-                                ui.available_size(),
-                                egui::DragValue::new(&mut self.settings.draft.offset_x)
-                                    .speed(1)
-                                    .suffix(" px"),
-                            )
-                            .on_hover_text(
-                                "Distance inward from the anchored edge; negative moves past it",
-                            );
-                            ui.end_row();
-
-                            ui.label("Vertical offset");
-                            ui.add_sized(
-                                ui.available_size(),
-                                egui::DragValue::new(&mut self.settings.draft.offset_y)
-                                    .speed(1)
-                                    .suffix(" px"),
-                            )
-                            .on_hover_text(
-                                "Distance inward from the anchored edge; negative moves past it",
-                            );
-                            ui.end_row();
-
-                            ui.label("Key unit size");
-                            ui.add_sized(
-                                ui.available_size(),
-                                egui::DragValue::new(&mut self.settings.draft.size)
-                                    .speed(1)
-                                    .range(20..=1000)
-                                    .suffix(" px"),
-                            );
-                            ui.end_row();
-
-                            ui.label("Key label font scale");
-                            ui.add_sized(
-                                ui.available_size(),
-                                egui::DragValue::new(&mut self.settings.draft.font_size_multiplier)
-                                    .speed(0.01)
-                                    .range(0.5..=1.5)
-                                    .suffix(" x"),
-                            );
-                            ui.end_row();
-
-                            ui.label("Auto-fit long labels");
-                            ui.checkbox(
-                                &mut self.settings.draft.auto_fit_before_ellipsis,
-                                "Fit long labels to available space",
-                            );
-                            ui.end_row();
-
-                            ui.label("Legend mode");
-                            egui::ComboBox::from_id_salt("legend_mode_combo")
-                                .width(ui.available_width())
-                                .selected_text(self.settings.draft.legend_mode.to_string())
-                                .show_ui(ui, |ui| {
-                                    for mode in LegendMode::ALL {
-                                        ui.selectable_value(
-                                            &mut self.settings.draft.legend_mode,
-                                            mode,
-                                            mode.to_string(),
-                                        );
-                                    }
-                                })
-                                .response
-                                .on_hover_text(
-                                    "Stacked: Base+Shifted shown together (default). Single: \
-                                     only what a plain tap produces. Single + live preview: \
-                                     also swaps to the Shift/RAlt result while that modifier \
-                                     is physically held.",
-                                );
-                            ui.end_row();
-                        });
+        let close_requested = ctx.show_viewport_immediate(
+            egui::ViewportId::from_hash_of("keypeek_settings"),
+            builder,
+            |ui, _class| {
+                egui::CentralPanel::default().show(ui, |ui| {
+                    egui::ScrollArea::vertical().show(ui, |ui| self.draw_settings_contents(ui));
                 });
-
-                titled_group(ui, "Theme", |ui| {
-                    const LAYER_LABELS: [&str; ThemeSettings::OTHER_LAYERS as usize] = [
-                        "Layer 0", "Layer 1", "Layer 2", "Layer 3", "Layer 4", "Layer 5",
-                    ];
-                    const HALF: usize = LAYER_LABELS.len() / 2;
-
-                    let draft = &mut self.settings.draft;
-
-                    let mut layer_row = |ui: &mut egui::Ui, layer: usize| {
-                        let (label, mask) = if layer == ThemeSettings::OTHER_LAYERS as usize {
-                            ("Other layers", !0 << layer)
-                        } else {
-                            (LAYER_LABELS[layer], 1 << layer)
-                        };
-                        Self::theme_layer_entry(
-                            ui,
-                            label,
-                            &mut draft.theme.layer_colors[layer],
-                            &mut draft.visible_layers,
-                            mask,
-                        );
-                    };
-                    ui.columns(2, |columns| {
-                        columns[0].vertical(|ui| {
-                            Self::theme_color_entry(ui, "Font color", &mut draft.theme.font_color);
-                            for layer in 0..HALF {
-                                layer_row(ui, layer);
-                            }
-                        });
-                        columns[1].vertical(|ui| {
-                            for layer in HALF..LAYER_LABELS.len() {
-                                layer_row(ui, layer);
-                            }
-                            layer_row(ui, ThemeSettings::OTHER_LAYERS as usize);
-                        });
-                    });
-                });
-
-                ui.add_space(8.0);
-                ui.horizontal(|ui| {
-                    github_link(ui);
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        version_link(ui);
-                    });
-                });
-            });
+                Self::message_window(ui.ctx(), "Error", &mut self.core.ui.settings_error);
+                Self::message_window(ui.ctx(), "Notice", &mut self.core.ui.settings_warning);
+                ui.ctx().input(|i| i.viewport().close_requested())
+            },
+        );
 
         self.sync_visual_settings();
 
-        if self.ui.settings_visible && !open {
+        if close_requested {
             self.ui.settings_visible = false;
             self.persist_settings();
-            if !self.connection_mgr.ever_connected() {
-                self.request_close_editor();
-                host.request_close();
-            }
         }
+    }
+
+    fn draw_settings_contents(&mut self, ui: &mut egui::Ui) {
+        self.draw_connection_settings(ui);
+
+        titled_group(ui, "Overlay Appearance", |ui| {
+            egui::Grid::new("appearance_grid")
+                .num_columns(2)
+                .striped(true)
+                .spacing([20.0, 10.0])
+                .show(ui, |ui| {
+                    ui.label("Alignment");
+                    egui::ComboBox::from_id_salt("position_combo")
+                        .width(ui.available_width())
+                        .selected_text(self.settings.draft.position.to_string())
+                        .show_ui(ui, |ui| {
+                            for pos in WindowPosition::ALL {
+                                ui.selectable_value(
+                                    &mut self.settings.draft.position,
+                                    pos,
+                                    pos.to_string(),
+                                );
+                            }
+                        });
+                    ui.end_row();
+
+                    ui.label("Monitor");
+                    let monitors = self.ui.available_monitors.clone();
+                    egui::ComboBox::from_id_salt("monitor_combo")
+                        .width(ui.available_width())
+                        .selected_text(self.settings.draft.monitor.to_string())
+                        .show_ui(ui, |ui| {
+                            ui.selectable_value(
+                                &mut self.settings.draft.monitor,
+                                MonitorSelection::Primary,
+                                "Primary",
+                            );
+                            for name in monitors {
+                                let value = MonitorSelection::Named(name.clone());
+                                ui.selectable_value(&mut self.settings.draft.monitor, value, name);
+                            }
+                        });
+                    if self.ui.available_monitors.is_empty() {
+                        ui.small("This display server does not report output names.");
+                    }
+                    ui.end_row();
+
+                    ui.label("Display duration");
+                    let mut timeout_ui = Self::timeout_to_ui_value(self.settings.draft.timeout);
+                    ui.add_sized(
+                        ui.available_size(),
+                        egui::DragValue::new(&mut timeout_ui)
+                            .speed(50)
+                            .range(0..=15_000)
+                            .custom_formatter(|value, _range| {
+                                if value >= 15_000.0 {
+                                    "∞".to_string()
+                                } else {
+                                    format!("{} ms", value as i64)
+                                }
+                            }),
+                    );
+                    self.settings.draft.timeout = Self::ui_value_to_timeout(timeout_ui);
+                    ui.end_row();
+
+                    ui.label("Activation delay");
+                    ui.add_sized(
+                        ui.available_size(),
+                        egui::DragValue::new(&mut self.settings.draft.activation_delay)
+                            .speed(10)
+                            .range(0..=Settings::MAX_ACTIVATION_DELAY_MS)
+                            .suffix(" ms"),
+                    )
+                    .on_hover_text("How long a layer has to be held before the overlay appears");
+                    ui.end_row();
+
+                    ui.label("Horizontal offset");
+                    ui.add_sized(
+                        ui.available_size(),
+                        egui::DragValue::new(&mut self.settings.draft.offset_x)
+                            .speed(1)
+                            .suffix(" px"),
+                    )
+                    .on_hover_text(
+                        "Distance inward from the anchored edge; negative moves past it",
+                    );
+                    ui.end_row();
+
+                    ui.label("Vertical offset");
+                    ui.add_sized(
+                        ui.available_size(),
+                        egui::DragValue::new(&mut self.settings.draft.offset_y)
+                            .speed(1)
+                            .suffix(" px"),
+                    )
+                    .on_hover_text(
+                        "Distance inward from the anchored edge; negative moves past it",
+                    );
+                    ui.end_row();
+
+                    ui.label("Key unit size");
+                    ui.add_sized(
+                        ui.available_size(),
+                        egui::DragValue::new(&mut self.settings.draft.size)
+                            .speed(1)
+                            .range(20..=1000)
+                            .suffix(" px"),
+                    );
+                    ui.end_row();
+
+                    ui.label("Key label font scale");
+                    ui.add_sized(
+                        ui.available_size(),
+                        egui::DragValue::new(&mut self.settings.draft.font_size_multiplier)
+                            .speed(0.01)
+                            .range(0.5..=1.5)
+                            .suffix(" x"),
+                    );
+                    ui.end_row();
+
+                    ui.label("Auto-fit long labels");
+                    ui.checkbox(
+                        &mut self.settings.draft.auto_fit_before_ellipsis,
+                        "Fit long labels to available space",
+                    );
+                    ui.end_row();
+
+                    ui.label("Legend mode");
+                    egui::ComboBox::from_id_salt("legend_mode_combo")
+                        .width(ui.available_width())
+                        .selected_text(self.settings.draft.legend_mode.to_string())
+                        .show_ui(ui, |ui| {
+                            for mode in LegendMode::ALL {
+                                ui.selectable_value(
+                                    &mut self.settings.draft.legend_mode,
+                                    mode,
+                                    mode.to_string(),
+                                );
+                            }
+                        })
+                        .response
+                        .on_hover_text(
+                            "Stacked: Base+Shifted shown together (default). Single: \
+                             only what a plain tap produces. Single + live preview: \
+                             also swaps to the Shift/RAlt result while that modifier \
+                             is physically held.",
+                        );
+                    ui.end_row();
+                });
+        });
+
+        titled_group(ui, "Theme", |ui| {
+            const LAYER_LABELS: [&str; ThemeSettings::OTHER_LAYERS as usize] = [
+                "Layer 0", "Layer 1", "Layer 2", "Layer 3", "Layer 4", "Layer 5",
+            ];
+            const HALF: usize = LAYER_LABELS.len() / 2;
+
+            let draft = &mut self.settings.draft;
+
+            let mut layer_row = |ui: &mut egui::Ui, layer: usize| {
+                let (label, mask) = if layer == ThemeSettings::OTHER_LAYERS as usize {
+                    ("Other layers", !0 << layer)
+                } else {
+                    (LAYER_LABELS[layer], 1 << layer)
+                };
+                Self::theme_layer_entry(
+                    ui,
+                    label,
+                    &mut draft.theme.layer_colors[layer],
+                    &mut draft.visible_layers,
+                    mask,
+                );
+            };
+            ui.columns(2, |columns| {
+                columns[0].vertical(|ui| {
+                    Self::theme_color_entry(ui, "Font color", &mut draft.theme.font_color);
+                    for layer in 0..HALF {
+                        layer_row(ui, layer);
+                    }
+                });
+                columns[1].vertical(|ui| {
+                    for layer in HALF..LAYER_LABELS.len() {
+                        layer_row(ui, layer);
+                    }
+                    layer_row(ui, ThemeSettings::OTHER_LAYERS as usize);
+                });
+            });
+        });
+
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
+            github_link(ui);
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                version_link(ui);
+            });
+        });
     }
 }

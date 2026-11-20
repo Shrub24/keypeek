@@ -19,10 +19,6 @@ impl OverlayHost for WebHost {
     fn set_passthrough(&mut self, _enabled: bool) {
         // Window mouse passthrough is not applicable to web canvas.
     }
-
-    fn request_close(&mut self) {
-        // Window close is not applicable to web canvas.
-    }
 }
 
 pub struct WebApp {

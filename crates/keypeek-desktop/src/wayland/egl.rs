@@ -3,27 +3,24 @@ use std::sync::Arc;
 
 use egui_glow::glow;
 use khronos_egl as egl;
-use wayland_client::{Connection, Proxy};
+use wayland_client::{protocol::wl_surface::WlSurface, Connection, Proxy};
 use wayland_egl::WlEglSurface;
 
 type Egl = egl::Instance<egl::Static>;
 
-pub struct EglState {
+/// The one EGL context every surface is drawn with.
+///
+/// egui sends each texture once, so all surfaces must share a context (and a
+/// painter): a context created later would never receive the font atlas.
+pub struct EglContext {
     egl: Egl,
     display: egl::Display,
-    surface: egl::Surface,
+    config: egl::Config,
     context: egl::Context,
-    wl_egl_surface: WlEglSurface,
-    pub gl: Arc<glow::Context>,
 }
 
-impl EglState {
-    pub fn new(
-        conn: &Connection,
-        wl_surface: &wayland_client::protocol::wl_surface::WlSurface,
-        width: i32,
-        height: i32,
-    ) -> Result<Self, String> {
+impl EglContext {
+    pub fn new(conn: &Connection) -> Result<Self, String> {
         let egl = egl::Instance::new(egl::Static);
 
         // The EGL display is derived from the Wayland display pointer.
@@ -59,48 +56,76 @@ impl EglState {
             .create_context(display, config, None, &context_attribs)
             .map_err(|e| format!("eglCreateContext failed: {e}"))?;
 
+        Ok(Self {
+            egl,
+            display,
+            config,
+            context,
+        })
+    }
+
+    /// Loads the GL functions; needs the context current, which takes a surface.
+    pub fn load_gl(&self) -> Arc<glow::Context> {
+        let gl = unsafe {
+            glow::Context::from_loader_function(|name| {
+                self.egl
+                    .get_proc_address(name)
+                    .map_or(std::ptr::null(), |p| p as *const c_void)
+            })
+        };
+        Arc::new(gl)
+    }
+}
+
+/// The EGL window of one `wl_surface`, drawn with the shared [`EglContext`].
+pub struct EglWindow {
+    egl: Egl,
+    display: egl::Display,
+    surface: egl::Surface,
+    wl_egl_surface: WlEglSurface,
+}
+
+impl EglWindow {
+    /// `swap_interval` 0 keeps a hidden surface from blocking the shared draw loop
+    /// on a frame callback that never comes.
+    pub fn new(
+        ctx: &EglContext,
+        wl_surface: &WlSurface,
+        width: i32,
+        height: i32,
+        swap_interval: i32,
+    ) -> Result<Self, String> {
         let wl_egl_surface = WlEglSurface::new(wl_surface.id(), width.max(1), height.max(1))
             .map_err(|e| format!("WlEglSurface::new failed: {e}"))?;
 
         let surface = unsafe {
-            egl.create_window_surface(
-                display,
-                config,
+            ctx.egl.create_window_surface(
+                ctx.display,
+                ctx.config,
                 wl_egl_surface.ptr() as egl::NativeWindowType,
                 None,
             )
         }
         .map_err(|e| format!("eglCreateWindowSurface failed: {e}"))?;
 
-        egl.make_current(display, Some(surface), Some(surface), Some(context))
-            .map_err(|e| format!("eglMakeCurrent failed: {e}"))?;
-        // Sync swaps to the compositor; avoids tearing on the overlay.
-        let _ = egl.swap_interval(display, 1);
-
-        let gl = unsafe {
-            glow::Context::from_loader_function(|name| {
-                egl.get_proc_address(name)
-                    .map_or(std::ptr::null(), |p| p as *const c_void)
-            })
-        };
-
-        Ok(Self {
-            egl,
-            display,
+        let window = Self {
+            egl: egl::Instance::new(egl::Static),
+            display: ctx.display,
             surface,
-            context,
             wl_egl_surface,
-            gl: Arc::new(gl),
-        })
+        };
+        window.make_current(ctx)?;
+        let _ = ctx.egl.swap_interval(ctx.display, swap_interval);
+        Ok(window)
     }
 
-    pub fn make_current(&self) -> Result<(), String> {
-        self.egl
+    pub fn make_current(&self, ctx: &EglContext) -> Result<(), String> {
+        ctx.egl
             .make_current(
-                self.display,
+                ctx.display,
                 Some(self.surface),
                 Some(self.surface),
-                Some(self.context),
+                Some(ctx.context),
             )
             .map_err(|e| format!("eglMakeCurrent failed: {e}"))
     }
@@ -114,5 +139,12 @@ impl EglState {
         self.egl
             .swap_buffers(self.display, self.surface)
             .map_err(|e| format!("eglSwapBuffers failed: {e}"))
+    }
+}
+
+impl Drop for EglWindow {
+    fn drop(&mut self) {
+        // Release the EGL surface before its wl_egl_window (dropped next) goes away.
+        let _ = self.egl.destroy_surface(self.display, self.surface);
     }
 }
