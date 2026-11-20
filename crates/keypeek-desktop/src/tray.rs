@@ -10,13 +10,8 @@ use tray_icon::{
 };
 
 /// Keeps the tray icon alive for the lifetime of the app.
-///
-/// On Linux the icon lives on a dedicated GTK thread: libappindicator
-/// registers the StatusNotifierItem over DBus via the glib main loop, so the
-/// tray only works if `gtk::main()` runs on the thread that created it.
 pub struct Tray {
-    #[cfg(not(target_os = "linux"))]
-    _icon: TrayIcon,
+    _icon: Option<TrayIcon>,
 }
 
 // Windows convention is a monochrome glyph matching the taskbar theme.
@@ -54,7 +49,7 @@ fn create_icon() -> Icon {
     Icon::from_rgba(icon.into_raw(), width, height).expect("Failed to create icon.")
 }
 
-fn build_tray_icon() -> TrayIcon {
+fn build_tray_icon() -> tray_icon::Result<TrayIcon> {
     let menu = Menu::new();
     menu.append_items(&[
         &MenuItem::with_id("settings", "Settings…", true, None),
@@ -79,7 +74,7 @@ fn build_tray_icon() -> TrayIcon {
     #[cfg(target_os = "macos")]
     let builder = builder.with_icon_as_template(true);
 
-    builder.build().unwrap()
+    builder.build()
 }
 
 pub fn create_tray_icon(commands: Arc<CommandQueue>, ui_wake: UiWake) -> Tray {
@@ -120,18 +115,12 @@ pub fn create_tray_icon(commands: Arc<CommandQueue>, ui_wake: UiWake) -> Tray {
         }
     });
 
-    #[cfg(target_os = "linux")]
-    {
-        thread::spawn(|| {
-            gtk::init().expect("Failed to initialize GTK. Is a display available?");
-            let _icon = build_tray_icon();
-            gtk::main();
-        });
-        Tray {}
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    Tray {
-        _icon: build_tray_icon(),
-    }
+    let icon = match build_tray_icon() {
+        Ok(icon) => Some(icon),
+        Err(err) => {
+            eprintln!("KeyPeek: tray unavailable: {err}");
+            None
+        }
+    };
+    Tray { _icon: icon }
 }

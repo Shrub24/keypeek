@@ -23,7 +23,7 @@ web-time = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 eframe = { workspace = true, features = ["wayland", "x11"] }
-gtk = "0.18"
+tray-icon = { workspace = true, features = ["ksni"] }
 winit = { version = "0.30.13", features = ["x11"] }
 egui_glow = "0.36.1"
 xkbcommon = { workspace = true }

@@ -15,6 +15,10 @@ Features land as one atomic change per concern, in the approved sequence below. 
   - `add-output-selection` — landed: the overlay is bound to a chosen output and retargets live.
   - `add-device-profiles-and-autoconnect`
 
+## Deferred maintenance
+
+- Upgrade egui, eframe, and the file dialog together once upstream `egui-phosphor` supports egui 0.37. Keep one egui version rather than adding a fork or a second copy of the GUI stack.
+
 ## Withdrawn and re-scoped changes
 
 - **`render-custom-zmk-behaviors` — withdrawn.** Upstream #28 landed custom ZMK behavior rendering, with OS-layout-aware labels (#35) and a single-legend mode (#38) alongside it.
@@ -32,7 +36,7 @@ Decisions by source:
 - **PR #17 (IPC/CLI control).** Open and conflicting, bundling `--toggle`/`--settings` with unrelated keyboard work. Only the toggle and settings-request concepts are reimplemented, in `add-declarative-overlay-service`.
 - **PR #29 (Vial layout options).** Deferred until a local need appears; upstream progress is tracked in the meantime.
 - **PR #30 (layout-aware labels).** Closed, with its behaviour superseded upstream by #35.
-- **Upstream browser target and Windows/macOS platform work.** Not a downstream concern. Changes must keep the workspace compiling under `cargo nextest --workspace` and, where they touch shared crates, keep the `wasm32` build available; no downstream feature may target the browser or those platforms.
+- **Upstream browser target and Windows/macOS platform work.** Not a downstream concern. Keep the native test gate and the separate `wasm32` build working; no downstream feature may target the browser or those platforms.
 
 ## Intake rule for external changes
 

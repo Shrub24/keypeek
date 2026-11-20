@@ -45,7 +45,7 @@ rust-ini = "0.21.3"
 
 # Desktop native dependencies
 directories = "6.0.0"
-tray-icon = "0.24.2"
+tray-icon = { version = "0.26.1", default-features = false }
 hidapi = { version = "2.6.5", features = ["macos-shared-device"] }
 serialport = "4.10.0"
 winresource = "0.1.31"
