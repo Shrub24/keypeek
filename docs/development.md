@@ -10,7 +10,7 @@ KeyPeek is a Linux/Nix-first, fully featured personal downstream of the upstream
 
 ## Code style
 
-- **Modern, idiomatic, declarative Rust and Nix.** Use current stable Rust idioms and the existing flake conventions (crane, fenix). Prefer data-driven, declarative forms over imperative glue.
+- **Modern, idiomatic, declarative Rust and Nix.** Use current stable Rust idioms and the existing flake conventions (flake-parts, crane). Prefer data-driven, declarative forms over imperative glue.
 - **Concise, consistent patterns.** Reuse existing helpers and patterns before adding new ones; match the surrounding code.
 - **YAGNI.** Build only what the task needs. No speculative abstraction, configuration, or scaffolding.
 - **Minimal comments.** Comments explain why, not what; prefer self-documenting code.

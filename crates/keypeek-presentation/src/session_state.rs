@@ -3,6 +3,7 @@
 //! Configuration is authoritative and may be read-only (a generated Nix file);
 //! state is a consequence of use and lives in the user's state directory.
 
+#[cfg(feature = "directories")]
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
@@ -31,8 +32,7 @@ impl FileSessionState {
     /// `~/.local/state/keypeek/last-device`.
     pub fn default_path() -> Option<PathBuf> {
         directories::ProjectDirs::from("dev", "srwi", "KeyPeek")
-            .map(|dirs| dirs.state_dir().map(|dir| dir.join("last-device")))
-            .flatten()
+            .and_then(|dirs| dirs.state_dir().map(|dir| dir.join("last-device")))
     }
 }
 

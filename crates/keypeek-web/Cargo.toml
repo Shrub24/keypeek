@@ -13,7 +13,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 keypeek-protocol = { workspace = true, default-features = false }
 keypeek-presentation = { workspace = true, default-features = false }
-eframe = { workspace = true }
+eframe = { workspace = true, features = ["wgpu", "web_screen_reader"] }
 egui = { workspace = true }
 egui_extras = { workspace = true }
 egui-phosphor = { workspace = true }

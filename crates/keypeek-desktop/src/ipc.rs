@@ -5,7 +5,7 @@
 //! hide, or reset the overlay without knowing anything about QMK, ZMK, or the
 //! UI. See `docs/roadmap.md` for why this is not D-Bus.
 
-use std::io::{BufRead, BufReader, ErrorKind, Read, Write};
+use std::io::{BufRead, BufReader, ErrorKind, Write};
 use std::os::unix::fs::PermissionsExt;
 use std::os::unix::net::{UnixListener, UnixStream};
 use std::path::{Path, PathBuf};

@@ -350,7 +350,6 @@ pub fn run(
         .map_err(|e| format!("failed to insert repaint ping source: {e}"))?;
 
     let egui_ctx = egui::Context::default();
-    egui_extras::install_image_loaders(&egui_ctx);
     let mut fonts = egui::FontDefinitions::default();
     add_phosphor_to_fonts(&mut fonts);
     egui_ctx.set_fonts(fonts);

@@ -17,12 +17,12 @@ keypeek-protocol = { workspace = true, features = ["desktop"] }
 keypeek-presentation = { workspace = true, features = ["desktop"] }
 eframe = { workspace = true }
 egui = { workspace = true }
-egui_extras = { workspace = true }
 tray-icon = { workspace = true }
 image = { workspace = true }
 web-time = { workspace = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
+eframe = { workspace = true, features = ["wayland", "x11"] }
 gtk = "0.18"
 winit = { version = "0.30.13", features = ["x11"] }
 egui_glow = "0.36.1"

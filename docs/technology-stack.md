@@ -12,7 +12,7 @@ Two features cross the layer boundary, both off for the browser build: `desktop`
 
 Rust on the stable toolchain. Notable dependencies:
 
-- **GUI**: `egui` / `eframe` (glow backend), plus `egui_extras`, `egui-phosphor`, `egui-file-dialog`, `image` for icons and textures.
+- **GUI**: `egui` / `eframe` (glow backend), with `egui-phosphor` and `egui-file-dialog`. The desktop tray decodes icons with `image`; the browser loads its SVGs with `egui_extras`.
 - **Keyboard protocols**: `qmk-via-api` for QMK/VIA and Vial over RAW HID; `zmk-studio-api` (serial and BLE features) for ZMK; `hidapi` for HID enumeration and access; `serialport` for serial transports; `prost` for ZMK Studio protobufs; `lzma-rs` for decompressing XZ-compressed Vial keyboard definitions. Both protocol crates are published libraries maintained alongside this project.
 - **Async plumbing**: `futures-util` / `futures-channel` for the event streams that connect background readers to sessions.
 - **Platform integration**: `tray-icon` for the system tray; on Linux `gtk`, `winit` (X11), `smithay-client-toolkit`, `wayland-client`, `wayland-egl` and `khronos-egl` for the native Wayland overlay, plus `xkbcommon` and `x11rb` for reading the active keyboard layout; on macOS `winit` and `objc2-app-kit`; on Windows the `windows` crate (Bluetooth/radios, DWM, and keyboard-layout APIs) and `winreg`.
@@ -21,7 +21,7 @@ Rust on the stable toolchain. Notable dependencies:
 
 ## Build and packaging
 
-- **Nix flake** is the primary Linux build. It uses `crane` with a `fenix` Rust toolchain and `flake-utils`. The flake exposes the `keypeek` package (wrapped with the required `LD_LIBRARY_PATH`, plus the desktop entry, scalable icon, and the BLE udev rule under `lib/udev/rules.d`), the `homeManagerModules.default` and `nixosModules.default` outputs, `nix flake check` checks (package build, `cargo-nextest` over the workspace, pre-commit Nix hooks, and evaluations of both modules), a `keypeek-llvm-coverage` package, and a dev shell carrying the same library path. The flake defines alejandra, deadnix, and statix hooks; `direnv` loads the development shell via `.envrc`.
+- **Nix flake** is the primary Linux build. It uses `flake-parts` and `crane` with the nixpkgs Rust toolchain. It exports the native `keypeek` package, `homeManagerModules.default`, `nixosModules.default`, and a development shell. `nix flake check` builds the package, runs native tests with nextest, checks both integration modules, and runs alejandra, deadnix, and statix. The package installs the desktop entry, scalable icon, and BLE udev rule; the binary wrapper and dev shell supply the Wayland and EGL library path.
 - **Linux AppImage** is produced by `cargo-appimage` with `appimagetool`, using the desktop entry in `cargo-appimage.desktop` and `resources/icon.png`.
 - **Windows** builds a plain release executable; `keypeek-desktop`'s `build.rs` embeds the icon via `winresource`.
 - **macOS** builds a `.app` bundle with `cargo-bundle`; bundle metadata lives in `crates/keypeek-desktop/Cargo.toml` (`package.metadata.bundle`) with an Info.plist extension in `resources/macos-info-plist-ext.xml`.
@@ -35,4 +35,4 @@ Three GitHub Actions workflows:
 - **Evaluate Nix** (`evaluate-nix.yml`) installs Nix and runs `nix flake check` to validate the flake and build the package.
 - **Deploy pages** (`deploy-pages.yml`) builds and publishes the browser app.
 
-The workspace test gate runs `cargo nextest --workspace`, so the browser crate must keep compiling for the host target even though it is only shipped as WebAssembly.
+The native Nix test gate excludes `keypeek-web`; the Pages workflow builds it for `wasm32-unknown-unknown`.

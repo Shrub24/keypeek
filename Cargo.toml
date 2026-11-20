@@ -36,9 +36,9 @@ zmk-studio-api = { version = "0.6.1", default-features = false }
 
 # GUI & Graphics
 egui = "0.36.1"
-eframe = { version = "0.36.1", features = ["glow"] }
-egui_extras = { version = "0.36.1", features = ["all_loaders"] }
-egui-phosphor = "0.13.0"
+eframe = { version = "0.36.1", default-features = false, features = ["glow", "default_fonts", "links"] }
+egui_extras = { version = "0.36.1", features = ["svg"] }
+egui-phosphor = "0.14.0"
 egui-file-dialog = "0.15.0"
 image = "0.25.10"
 rust-ini = "0.21.3"

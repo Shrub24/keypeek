@@ -190,8 +190,6 @@ fn run_inner(
             #[cfg(target_os = "windows")]
             enable_dwm_per_pixel_alpha(cc);
 
-            egui_extras::install_image_loaders(&cc.egui_ctx);
-
             let ctx = cc.egui_ctx.clone();
             let ui_wake = UiWake::new(Arc::new(move || ctx.request_repaint()));
             let commands = Arc::new(CommandQueue::default());
