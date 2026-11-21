@@ -33,7 +33,7 @@ enum Action {
 
 const USAGE: &str = "usage: keypeek [--config <path>] [--no-settings]\n       \
                      keypeek --settings [--config <path>]\n       \
-                     keypeek --toggle|--show|--hide|--auto";
+                     keypeek <toggle|show|hide|auto>";
 
 /// Parses the command line.
 ///
@@ -58,10 +58,10 @@ fn parse<I: Iterator<Item = String>>(args: I) -> Invocation {
             },
             "--no-settings" => no_settings = true,
             "--settings" => set_action(&mut action, Action::Attach),
-            "--toggle" => set_action(&mut action, Action::Control(OverlayCommand::Toggle)),
-            "--show" => set_action(&mut action, Action::Control(OverlayCommand::Show)),
-            "--hide" => set_action(&mut action, Action::Control(OverlayCommand::Hide)),
-            "--auto" => set_action(&mut action, Action::Control(OverlayCommand::Auto)),
+            "toggle" => set_action(&mut action, Action::Control(OverlayCommand::Toggle)),
+            "show" => set_action(&mut action, Action::Control(OverlayCommand::Show)),
+            "hide" => set_action(&mut action, Action::Control(OverlayCommand::Hide)),
+            "auto" => set_action(&mut action, Action::Control(OverlayCommand::Auto)),
             other => usage_error(&format!("unrecognized argument `{other}`")),
         }
     }
@@ -89,7 +89,7 @@ fn parse<I: Iterator<Item = String>>(args: I) -> Invocation {
 
 fn set_action(slot: &mut Option<Action>, action: Action) {
     if slot.replace(action).is_some() {
-        usage_error("only one of --settings, --toggle, --show, --hide, --auto may be given");
+        usage_error("only one action may be given");
     }
 }
 
@@ -216,13 +216,17 @@ mod tests {
 
     #[test]
     fn hotkey_commands_parse() {
-        for (flag, command) in [
-            ("--toggle", OverlayCommand::Toggle),
-            ("--show", OverlayCommand::Show),
-            ("--hide", OverlayCommand::Hide),
-            ("--auto", OverlayCommand::Auto),
+        for (subcommand, command) in [
+            ("toggle", OverlayCommand::Toggle),
+            ("show", OverlayCommand::Show),
+            ("hide", OverlayCommand::Hide),
+            ("auto", OverlayCommand::Auto),
         ] {
-            assert_eq!(invocation(&[flag]), Invocation::Control(command), "{flag}");
+            assert_eq!(
+                invocation(&[subcommand]),
+                Invocation::Control(command),
+                "{subcommand}"
+            );
         }
     }
 }

@@ -20,10 +20,10 @@ A launcher invocation SHALL open the settings window of the instance that owns t
 - **THEN** a running instance is attached to, and the configuration applies only if an instance had to be started
 
 ### Requirement: Hotkey commands never start an instance
-`--toggle`, `--show`, `--hide`, and `--auto` SHALL fail with a message when nothing is listening.
+`toggle`, `show`, `hide`, and `auto` SHALL fail with a message when nothing is listening.
 
 #### Scenario: A hotkey is pressed with no instance
-- **WHEN** `keypeek --toggle` runs with nothing listening on the control socket
+- **WHEN** `keypeek toggle` runs with nothing listening on the control socket
 - **THEN** it reports the socket path, exits with a non-zero status, and starts nothing
 
 ### Requirement: The settings window opens only when it is useful

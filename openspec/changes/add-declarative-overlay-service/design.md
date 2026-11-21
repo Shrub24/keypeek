@@ -24,9 +24,9 @@ KeyPeek is started either by the user or by a systemd user service. In the decla
 
 ### A line protocol on a Unix socket in the runtime directory
 
-The instance listens on `$XDG_RUNTIME_DIR/keypeek.sock` (falling back to the temporary directory), mode `0600`, and reads one command per line from each connection and closes it. The client is the same binary, so no second executable, no D-Bus dependency, and any compositor can bind a key to `keypeek --toggle`.
+The instance listens on `$XDG_RUNTIME_DIR/keypeek.sock` (falling back to the temporary directory), mode `0600`, and reads one command per line from each connection and closes it. The client is the same binary, so no second executable, no D-Bus dependency, and any compositor can bind a key to `keypeek toggle`.
 
-Alternatives: D-Bus would add `zbus` and interface paperwork for five methods; a separate `keypeekctl` binary duplicates argument parsing and packaging for no gain. A `--toggle` that writes state to the settings file and asks the running instance to reload would break under the read-only store.
+Alternatives: D-Bus would add `zbus` and interface paperwork for five methods; a separate `keypeekctl` binary duplicates argument parsing and packaging for no gain. A `toggle` that writes state to the settings file and asks the running instance to reload would break under the read-only store.
 
 Binding behavior: the socket is created at startup. A leftover file from a killed process is removed after a failed connection attempt, and a second instance that finds a live socket reports that instead of silently replacing it.
 
@@ -48,6 +48,6 @@ Alternative: store the override itself in an atomic shared with the listener. Re
 
 ## Risks
 
-- **Socket left behind by a crash.** Handled by the connect-then-unlink sequence; a stale socket refuses connections immediately, so `--toggle` fails fast with a message rather than hanging.
+- **Socket left behind by a crash.** Handled by the connect-then-unlink sequence; a stale socket refuses connections immediately, so `toggle` fails fast with a message rather than hanging.
 - **Two instances.** The second one finds a live socket and reports it; it still runs, since running two overlays is a legitimate way to watch two keyboards, but it does not take over the control socket.
 - **Override forgotten.** `Shown` keeps the overlay on screen past the configured timeout. The tray menu shows the current state and offers `Auto` as the way back, and the override dies with the process.

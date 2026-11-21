@@ -2,7 +2,7 @@
 
 - [x] 1.1 Make `--settings` attach-or-start and keep hotkey commands fail-fast.
   - refs: `specs/launcher-attach/spec.md`, `design.md`
-  - criteria: `--settings` starts an instance with settings visible when nothing answers; `--toggle` and friends still exit non-zero; `--config` with `--settings` is accepted, with the other commands rejected.
+  - criteria: `--settings` starts an instance with settings visible when nothing answers; `toggle` and the other visibility commands still exit non-zero; `--config` with `--settings` is accepted, with the other commands rejected.
   - delegate: CoderAgent
   - verify: Run each flag against a listener, against no listener, and with `--config`.
 - [x] 1.2 Add `--no-settings`.

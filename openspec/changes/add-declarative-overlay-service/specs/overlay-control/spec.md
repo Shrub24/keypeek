@@ -54,15 +54,15 @@ The override SHALL NOT be written to the settings store, so a read-only declarat
 - **THEN** it starts in `Auto`
 
 ### Requirement: The binary forwards control commands
-`keypeek` SHALL accept `--toggle`, `--show`, `--hide`, `--auto`, and `--settings`, forward the matching command to the running instance, and exit without starting the application.
+`keypeek` SHALL accept `toggle`, `show`, `hide`, and `auto`, forward the matching command to the running instance, and exit without starting the application.
 
 #### Scenario: A command is bound to a key
-- **WHEN** the user binds a compositor key to `keypeek --toggle`
+- **WHEN** the user binds a compositor key to `keypeek toggle`
 - **THEN** each invocation toggles the overlay of the running instance and exits immediately
 
 #### Scenario: Toggle is resolved against current visibility
-- **WHEN** `--toggle` arrives while the overlay is visible
-- **THEN** it becomes hidden, and the next `--toggle` shows it again
+- **WHEN** `toggle` arrives while the overlay is visible
+- **THEN** it becomes hidden, and the next `toggle` shows it again
 
 #### Scenario: Arguments are contradictory
 - **WHEN** `--config` is combined with a control command
@@ -73,4 +73,4 @@ The tray SHALL offer Show, Hide, and Auto alongside Settings… and Quit, and ro
 
 #### Scenario: The overlay is hidden from the tray
 - **WHEN** the user chooses Hide in the tray menu
-- **THEN** the overlay is hidden exactly as if `--hide` had been sent
+- **THEN** the overlay is hidden exactly as if `hide` had been sent

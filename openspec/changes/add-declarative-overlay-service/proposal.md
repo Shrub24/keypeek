@@ -6,7 +6,7 @@ Overlay visibility is driven entirely by held layers, so the user cannot hide th
 
 - Add a local control socket to the running desktop instance, with one command per line.
 - Add a manual visibility override with three states: layer-driven (`Auto`), pinned visible (`Shown`), and hidden (`Hidden`). The override lasts until it is changed again and is never written to settings.
-- Add `--toggle`, `--show`, `--hide`, `--auto`, and `--settings` to the `keypeek` binary, which forward the matching command to a running instance and exit.
+- Add `toggle`, `show`, `hide`, and `auto` subcommands and a `--settings` launcher option to the `keypeek` binary.
 - Route the existing tray request through the same command channel instead of a dedicated flag.
 - Add Show, Hide, and Auto entries to the tray menu.
 

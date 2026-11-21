@@ -170,14 +170,14 @@ The record lives in `~/.local/state/keypeek/last-device` (the `$XDG_STATE_HOME` 
 By default the overlay follows the layers you hold and disappears after the configured timeout. A running instance can also be driven from outside:
 
 ```sh
-keypeek --toggle     # hide if visible, show if hidden
-keypeek --show       # pin visible, regardless of layers
-keypeek --hide       # hide until re-enabled
-keypeek --auto       # back to layer-driven visibility
+keypeek toggle       # hide if visible, show if hidden
+keypeek show         # pin visible, regardless of layers
+keypeek hide         # hide until re-enabled
+keypeek auto         # back to layer-driven visibility
 keypeek --settings   # open the settings window
 ```
 
-Bind them like any other command in your compositor's configuration, for example `bind = SUPER, K, exec, keypeek --toggle` in a wlroots-style compositor.
+Bind `keypeek toggle` to a shortcut in your compositor’s configuration. Replace any existing bindings that use the old dashed syntax.
 
 These reach the running instance over `$XDG_RUNTIME_DIR/keypeek.sock`. The hotkey commands do nothing when KeyPeek is not running; `--settings` is the exception — it starts an instance with the settings window open when none is listening, which is why the desktop entry uses it. Launching KeyPeek from your application menu therefore configures the running instance instead of starting a second overlay.
 

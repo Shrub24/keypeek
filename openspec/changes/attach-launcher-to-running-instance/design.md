@@ -18,7 +18,7 @@ The desktop entry's `Exec` is rewritten to the store binary at package time, so 
 
 - Multi-instance management, instance naming, or a daemon that owns several overlays. One instance owns the control socket; the rest run uncontrolled, as today.
 - Making the settings window able to write configuration that a declarative store has made read-only. Session-only changes are the accepted behaviour.
-- Attach-or-start behaviour for `--toggle`/`--show`/`--hide`/`--auto`: a hotkey that silently starts an overlay would be worse than one that does nothing.
+- Attach-or-start behaviour for `toggle`/`show`/`hide`/`auto`: a hotkey that silently starts an overlay would be worse than one that does nothing.
 
 ## Decisions
 
