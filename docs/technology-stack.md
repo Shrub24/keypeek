@@ -35,4 +35,4 @@ Three GitHub Actions workflows:
 - **Evaluate Nix** (`evaluate-nix.yml`) installs Nix and runs `nix flake check` to validate the flake and build the package.
 - **Deploy pages** (`deploy-pages.yml`) builds and publishes the browser app.
 
-The native Nix test gate excludes `keypeek-web`; the Pages workflow builds it for `wasm32-unknown-unknown`.
+The native Nix test gate (`nix flake check`) excludes `keypeek-web`, which targets `wasm32-unknown-unknown`. The fork uses local Nix validation in place of the inherited GitHub Actions workflows until Nix-native CI is added.
